@@ -1,6 +1,7 @@
 package org.infinispan.stress;
 
 import org.infinispan.container.*;
+import org.infinispan.config.GlobalConfiguration.MemoryGuardType;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 import org.testng.annotations.Test;
@@ -33,7 +34,7 @@ public class DataContainerStressTest {
    private static final Random R = new Random();
 
    public void testSimpleDataContainer() throws InterruptedException {
-      doTest(DefaultDataContainer.unBoundedDataContainer(5000));
+      doTest(DefaultDataContainer.unBoundedDataContainer(5000, new MemoryGuardType()));
    }
 
    private void doTest(final DataContainer dc) throws InterruptedException {

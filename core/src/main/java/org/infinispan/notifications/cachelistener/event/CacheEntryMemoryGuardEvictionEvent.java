@@ -1,6 +1,6 @@
 /*
  * JBoss, Home of Professional Open Source.
- * Copyright 2000 - 2008, Red Hat Middleware LLC, and individual contributors
+ * Copyright 2009, Red Hat Middleware LLC, and individual contributors
  * as indicated by the @author tags. See the copyright.txt file in the
  * distribution for a full listing of individual contributors.
  *
@@ -21,33 +21,17 @@
  */
 package org.infinispan.notifications.cachelistener.event;
 
-import org.infinispan.Cache;
-
 /**
- * An interface that defines common characteristics of events
- *
- * @author Manik Surtani
- * @since 4.0
+ * This event subtype is passed in to any method annotated with {@link org.infinispan.notifications.cachelistener.annotation.CacheEntryMemoryGuardEvictionEvent}.
+ * 
+ * @author Dave Marion
+ * @since 5.0
  */
-public interface Event<K, V> {
-   static enum Type {
-      CACHE_ENTRY_ACTIVATED, CACHE_ENTRY_PASSIVATED, CACHE_ENTRY_VISITED,
-      CACHE_ENTRY_LOADED, CACHE_ENTRY_EVICTED, CACHE_ENTRY_CREATED, CACHE_ENTRY_REMOVED, CACHE_ENTRY_MODIFIED,
-      TRANSACTION_COMPLETED, TRANSACTION_REGISTERED, CACHE_ENTRY_INVALIDATED, CACHE_ENTRY_MEMORY_GUARD_EVICTED
-   }
-
+public interface CacheEntryMemoryGuardEvictionEvent<K, V> extends CacheEntryEvent<K, V> {
    /**
-    * @return the type of event represented by this instance.
+    * Retrieves the value of the entry being evicted.
+    *
+    * @return the value of the evicted entry
     */
-   Type getType();
-
-   /**
-    * @return <tt>true</tt> if the notification is before the event has occurred, <tt>false</tt> if after the event has occurred.
-    */
-   boolean isPre();
-
-   /**
-    * @return a handle to the cache instance that generated this notification.
-    */
-   Cache<K, V> getCache();
+   V getValue();
 }

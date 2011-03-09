@@ -94,4 +94,9 @@ public interface CacheNotifier extends Listenable {
     * @param globalTransaction
     */
    void notifyTransactionRegistered(GlobalTransaction globalTransaction, InvocationContext ctx);
+   
+   /**
+    * Notifies all registered listeners of a CacheEntryMemoryGuardEvicted event
+    */
+   void notifyCacheEntryMemoryGuardEvicted(final Object key, Object value, final boolean pre, InvocationContext ctx);
 }

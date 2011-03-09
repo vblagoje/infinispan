@@ -40,6 +40,7 @@ import org.infinispan.notifications.cachelistener.annotation.CacheEntryCreated;
 import org.infinispan.notifications.cachelistener.annotation.CacheEntryEvicted;
 import org.infinispan.notifications.cachelistener.annotation.CacheEntryInvalidated;
 import org.infinispan.notifications.cachelistener.annotation.CacheEntryLoaded;
+import org.infinispan.notifications.cachelistener.annotation.CacheEntryMemoryGuardEvicted;
 import org.infinispan.notifications.cachelistener.annotation.CacheEntryModified;
 import org.infinispan.notifications.cachelistener.annotation.CacheEntryPassivated;
 import org.infinispan.notifications.cachelistener.annotation.CacheEntryRemoved;
@@ -51,6 +52,7 @@ import org.infinispan.notifications.cachelistener.event.CacheEntryCreatedEvent;
 import org.infinispan.notifications.cachelistener.event.CacheEntryEvictedEvent;
 import org.infinispan.notifications.cachelistener.event.CacheEntryInvalidatedEvent;
 import org.infinispan.notifications.cachelistener.event.CacheEntryLoadedEvent;
+import org.infinispan.notifications.cachelistener.event.CacheEntryMemoryGuardEvictionEvent;
 import org.infinispan.notifications.cachelistener.event.CacheEntryModifiedEvent;
 import org.infinispan.notifications.cachelistener.event.CacheEntryPassivatedEvent;
 import org.infinispan.notifications.cachelistener.event.CacheEntryRemovedEvent;
@@ -86,6 +88,7 @@ public class CacheNotifierImpl extends AbstractListenerImpl implements CacheNoti
       allowedListeners.put(TransactionRegistered.class, TransactionRegisteredEvent.class);
       allowedListeners.put(TransactionCompleted.class, TransactionCompletedEvent.class);
       allowedListeners.put(CacheEntryInvalidated.class, CacheEntryInvalidatedEvent.class);
+      allowedListeners.put(CacheEntryMemoryGuardEvicted.class, CacheEntryMemoryGuardEvictionEvent.class);
 
    }
 
@@ -98,6 +101,7 @@ public class CacheNotifierImpl extends AbstractListenerImpl implements CacheNoti
    final List<ListenerInvocation> cacheEntryLoadedListeners = new CopyOnWriteArrayList<ListenerInvocation>();
    final List<ListenerInvocation> cacheEntryInvalidatedListeners = new CopyOnWriteArrayList<ListenerInvocation>();
    final List<ListenerInvocation> cacheEntryEvictedListeners = new CopyOnWriteArrayList<ListenerInvocation>();
+   final List<ListenerInvocation> cacheEntryMemoryGuardEvictedListeners = new CopyOnWriteArrayList<ListenerInvocation>();
    final List<ListenerInvocation> transactionRegisteredListeners = new CopyOnWriteArrayList<ListenerInvocation>();
    final List<ListenerInvocation> transactionCompletedListeners = new CopyOnWriteArrayList<ListenerInvocation>();
 
@@ -114,6 +118,7 @@ public class CacheNotifierImpl extends AbstractListenerImpl implements CacheNoti
       listenersMap.put(CacheEntryPassivated.class, cacheEntryPassivatedListeners);
       listenersMap.put(CacheEntryLoaded.class, cacheEntryLoadedListeners);
       listenersMap.put(CacheEntryEvicted.class, cacheEntryEvictedListeners);
+      listenersMap.put(CacheEntryMemoryGuardEvicted.class, cacheEntryMemoryGuardEvictedListeners);
       listenersMap.put(TransactionRegistered.class, transactionRegisteredListeners);
       listenersMap.put(TransactionCompleted.class, transactionCompletedListeners);
       listenersMap.put(CacheEntryInvalidated.class, cacheEntryInvalidatedListeners);
@@ -226,6 +231,25 @@ public class CacheNotifierImpl extends AbstractListenerImpl implements CacheNoti
             icc.resume(contexts);
          }
       }
+   }
+   
+   @Override
+   public void notifyCacheEntryMemoryGuardEvicted(final Object key, Object value, final boolean pre, InvocationContext ctx) {
+      if (!cacheEntryMemoryGuardEvictedListeners.isEmpty()) {
+         final boolean originLocal = ctx.isOriginLocal();
+         InvocationContext contexts = icc.suspend();
+         try {
+            EventImpl<Object, Object> e = EventImpl.createEvent(cache, CACHE_ENTRY_MEMORY_GUARD_EVICTED);
+            e.setOriginLocal(originLocal);
+            e.setPre(pre);
+            e.setKey(key);
+            e.setValue(value);
+            setTx(ctx, e);
+            for (ListenerInvocation listener : cacheEntryMemoryGuardEvictedListeners) listener.invoke(e);
+         } finally {
+            icc.resume(contexts);
+         }
+      }      
    }
 
    @Override

@@ -40,6 +40,8 @@ import org.infinispan.config.Configuration.UnsafeType;
 import org.infinispan.config.GlobalConfiguration.ExternalizersType;
 import org.infinispan.config.GlobalConfiguration.FactoryClassWithPropertiesType;
 import org.infinispan.config.GlobalConfiguration.GlobalJmxStatisticsType;
+import org.infinispan.config.GlobalConfiguration.ExternalizersType;
+import org.infinispan.config.GlobalConfiguration.MemoryGuardType;
 import org.infinispan.config.GlobalConfiguration.SerializationType;
 import org.infinispan.config.GlobalConfiguration.ShutdownType;
 import org.infinispan.config.GlobalConfiguration.TransportType;
@@ -125,5 +127,6 @@ public interface ConfigurationBeanVisitor {
    void visitExternalizersType(ExternalizersType bean);
    
    void visitExternalizerConfig(ExternalizerConfig config);
-
+   
+   void visitMemoryGuardType(MemoryGuardType bean);
 }

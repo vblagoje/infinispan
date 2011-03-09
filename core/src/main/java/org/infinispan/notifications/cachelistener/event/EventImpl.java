@@ -36,7 +36,7 @@ import org.infinispan.transaction.xa.GlobalTransaction;
 @NotThreadSafe
 public class EventImpl<K, V> implements CacheEntryActivatedEvent, CacheEntryCreatedEvent, CacheEntryEvictedEvent, CacheEntryLoadedEvent, CacheEntryModifiedEvent,
                                   CacheEntryPassivatedEvent, CacheEntryRemovedEvent, CacheEntryVisitedEvent, TransactionCompletedEvent, TransactionRegisteredEvent,
-                                  CacheEntryInvalidatedEvent {
+                                  CacheEntryInvalidatedEvent, CacheEntryMemoryGuardEvictionEvent {
    private boolean pre = false; // by default events are after the fact
    private Cache<K, V> cache;
    private K key;

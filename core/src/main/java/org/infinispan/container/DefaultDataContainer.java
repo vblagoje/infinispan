@@ -7,11 +7,11 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import net.jcip.annotations.ThreadSafe;
 
+import org.infinispan.config.GlobalConfiguration.MemoryGuardType;
 import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.container.entries.InternalEntryFactory;
 import org.infinispan.eviction.EvictionManager;
@@ -31,6 +31,7 @@ import org.infinispan.util.concurrent.BoundedConcurrentHashMap.EvictionListener;
  * @author Galder Zamarreño
  * @author Vladimir Blagojevic
  * @author <a href="http://gleamynode.net/">Trustin Lee</a>
+ * @author Dave Marion
  *
  * @since 4.0
  */
@@ -42,13 +43,11 @@ public class DefaultDataContainer implements DataContainer {
    final DefaultEvictionListener evictionListener;
    private EvictionManager evictionManager;
 
-   protected DefaultDataContainer(int concurrencyLevel) {
-      entries = new ConcurrentHashMap<Object, InternalCacheEntry>(128, 0.75f,concurrencyLevel);
-      entryFactory = new InternalEntryFactory();
-      evictionListener = null;
+   protected DefaultDataContainer(int concurrencyLevel, MemoryGuardType memoryGuard) {
+      this(concurrencyLevel, BoundedConcurrentHashMap.DEFAULT_MAXIMUM_CAPACITY, EvictionStrategy.NONE, EvictionThreadPolicy.PIGGYBACK, memoryGuard);      
    }
 
-   protected DefaultDataContainer(int concurrencyLevel, int maxEntries, EvictionStrategy strategy, EvictionThreadPolicy policy) {
+   protected DefaultDataContainer(int concurrencyLevel, int maxEntries, EvictionStrategy strategy, EvictionThreadPolicy policy, MemoryGuardType memoryGuard) {
 
       // translate eviction policy and strategy
       switch (policy) {
@@ -62,6 +61,9 @@ public class DefaultDataContainer implements DataContainer {
 
       Eviction eviction;
       switch (strategy) {
+         case NONE:
+            eviction = Eviction.NONE;
+            break;
          case FIFO:
          case UNORDERED:
          case LRU:
@@ -73,7 +75,7 @@ public class DefaultDataContainer implements DataContainer {
          default:
             throw new IllegalArgumentException("No such eviction strategy " + strategy);
       }
-      entries = new BoundedConcurrentHashMap<Object, InternalCacheEntry>(maxEntries, concurrencyLevel, eviction, evictionListener);
+      entries = new BoundedConcurrentHashMap<Object, InternalCacheEntry>(maxEntries, concurrencyLevel, eviction, evictionListener, memoryGuard);
       entryFactory = new InternalEntryFactory();
    }
 
@@ -83,12 +85,16 @@ public class DefaultDataContainer implements DataContainer {
    }
 
    public static DataContainer boundedDataContainer(int concurrencyLevel, int maxEntries,
-            EvictionStrategy strategy, EvictionThreadPolicy policy) {
-      return new DefaultDataContainer(concurrencyLevel, maxEntries, strategy, policy);
+            EvictionStrategy strategy, EvictionThreadPolicy policy, MemoryGuardType memoryGuard) {
+      return new DefaultDataContainer(concurrencyLevel, maxEntries, strategy, policy, memoryGuard);
    }
 
+   public static DataContainer unBoundedDataContainer(int concurrencyLevel, MemoryGuardType memoryGuard) {
+      return new DefaultDataContainer(concurrencyLevel, memoryGuard);
+   }
+   
    public static DataContainer unBoundedDataContainer(int concurrencyLevel) {
-      return new DefaultDataContainer(concurrencyLevel);
+      return new DefaultDataContainer(concurrencyLevel, new MemoryGuardType());
    }
 
    public InternalCacheEntry peek(Object key) {
@@ -172,10 +178,29 @@ public class DefaultDataContainer implements DataContainer {
    public Iterator<InternalCacheEntry> iterator() {
       return new EntryIterator(entries.values().iterator());
    }
+   
+   /**
+    * 
+    * @return number of entries evicted by the container or 0 if memory guard not enabled or not supported by the underlying implemention. 
+    */
+   public long getMemoryGuardEvictions() {
+      if (entries instanceof BoundedConcurrentHashMap) {
+         BoundedConcurrentHashMap<?,?> b = (BoundedConcurrentHashMap<?,?>) entries;
+         return b.getNumMemoryGuardEvictions();
+      }
+      else {
+         return 0;
+      }
+   }
 
    private class DefaultEvictionListener implements EvictionListener<Object, InternalCacheEntry> {
       @Override
       public void onEntryEviction(Map<Object, InternalCacheEntry> evicted) {
+         evictionManager.onEntryEviction(evicted);
+      }
+
+      @Override
+      public void onMemoryGuardEviction(Map<Object, InternalCacheEntry> evicted) {
          evictionManager.onEntryEviction(evicted);
       }
    }
@@ -280,4 +305,5 @@ public class DefaultDataContainer implements DataContainer {
          return currentIterator.next().getValue();
       }
    }
+   
 }

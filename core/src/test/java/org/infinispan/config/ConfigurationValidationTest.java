@@ -21,17 +21,17 @@
  */
 package org.infinispan.config;
 
+import static org.infinispan.config.Configuration.CacheMode.*;
+import org.infinispan.config.GlobalConfiguration.MemoryGuardType;
 import org.infinispan.manager.EmbeddedCacheManager;
 import org.infinispan.test.AbstractInfinispanTest;
 import org.infinispan.test.TestingUtil;
 import org.infinispan.test.fwk.TestCacheManagerFactory;
 import org.testng.annotations.Test;
 
-import static org.infinispan.config.Configuration.CacheMode.*;
-
 /**
  * ConfigurationValidationTest.
- *
+ * 
  * @author Sanne Grinovero
  * @since 4.0
  */
@@ -59,7 +59,7 @@ public class ConfigurationValidationTest extends AbstractInfinispanTest {
       }
    }
 
-   @Test (expectedExceptions = ConfigurationException.class)
+   @Test(expectedExceptions = ConfigurationException.class)
    public void testDistAndReplQueue() {
       EmbeddedCacheManager ecm = null;
       try {
@@ -73,7 +73,7 @@ public class ConfigurationValidationTest extends AbstractInfinispanTest {
       }
    }
 
-   @Test (expectedExceptions = ConfigurationException.class)
+   @Test(expectedExceptions = ConfigurationException.class)
    public void testSyncAndReplQueue() {
       EmbeddedCacheManager ecm = null;
       try {
@@ -86,8 +86,8 @@ public class ConfigurationValidationTest extends AbstractInfinispanTest {
          TestingUtil.killCacheManagers(ecm);
       }
    }
-   
-   @Test (expectedExceptions = ConfigurationException.class)
+
+   @Test(expectedExceptions = ConfigurationException.class)
    public void testEvictionOnButWithoutMaxEntries() {
       EmbeddedCacheManager ecm = null;
       try {
@@ -95,6 +95,23 @@ public class ConfigurationValidationTest extends AbstractInfinispanTest {
          c.setEvictionStrategy("LRU");
          ecm = TestCacheManagerFactory.createClusteredCacheManager(c);
          ecm.getCache();
+      } finally {
+         TestingUtil.killCacheManagers(ecm);
+      }
+   }
+
+   @Test
+   public void testDefaultMemoryGuardConfiguration() throws Exception {
+      EmbeddedCacheManager ecm = null;
+      try {
+         GlobalConfiguration gc = new GlobalConfiguration();
+         Configuration c = new Configuration();
+         c.setGlobalConfiguration(gc);
+         c.setEvictionMaxEntries(-1);
+         ecm = TestCacheManagerFactory.createCacheManager(gc, c);
+         ecm.getCache();
+         MemoryGuardType memGuard = c.getGlobalConfiguration().getMemoryGuardConfiguration();
+         assert (memGuard.isEnabled() == false);
       } finally {
          TestingUtil.killCacheManagers(ecm);
       }

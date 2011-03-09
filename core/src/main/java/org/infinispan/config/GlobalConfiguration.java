@@ -45,6 +45,7 @@ import java.util.Properties;
  * @author Vladimir Blagojevic
  * @author Mircea.Markus@jboss.com
  * @author Galder Zamarreño
+ * @author Dave Marion
  * @since 4.0
  * 
  * @see <a href="../../../config.html#ce_infinispan_global">Configuration reference</a>
@@ -330,6 +331,9 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
 
    @XmlElement
    ShutdownType shutdown = new ShutdownType();
+   
+   @XmlElement
+   MemoryGuardType memoryGuard = new MemoryGuardType();
 
    @XmlTransient
    GlobalComponentRegistry gcr;
@@ -532,6 +536,7 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
       gcr.registerComponent(transport, "transport");
       gcr.registerComponent(serialization, "serialization");
       gcr.registerComponent(shutdown, "shutdown");
+      gcr.registerComponent(memoryGuard, "memoryGuard");
    }
 
    protected boolean hasComponentStarted() {
@@ -859,6 +864,36 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
    public void setDistributedSyncTimeout(long distributedSyncTimeout) {
       transport.distributedSyncTimeout = distributedSyncTimeout;
    }
+   
+   public MemoryGuardType getMemoryGuardConfiguration() {
+      try {
+         if (null == memoryGuard)
+            return new MemoryGuardType();
+         return (MemoryGuardType) memoryGuard.clone();
+      } catch (CloneNotSupportedException e) {
+         return new MemoryGuardType();
+      }
+   }
+   
+   public void setMemoryGuardEnabled(boolean enabled) {
+      memoryGuard.setEnabled(enabled);
+   }
+   
+   public void setMemoryGuardPollInterval(long interval) {
+      memoryGuard.setPollInterval(interval);
+   }
+   
+   public void setMemoryGuardThreshold(double threshold) {
+      memoryGuard.setThreshold(threshold);
+   }
+   
+   public void setMemoryGuardEvictionsPerCycle(long evictions) {
+      memoryGuard.setEvictionsPerCycle(evictions);
+   }
+   
+   public void setMemoryGuardConfiguration(MemoryGuardType type) {
+      memoryGuard = type;
+   }
 
    public void accept(ConfigurationBeanVisitor v) {
       asyncListenerExecutor.accept(v);
@@ -869,6 +904,7 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
       serialization.accept(v);
       shutdown.accept(v);
       transport.accept(v);
+      memoryGuard.accept(v);
       v.visitGlobalConfiguration(this);
    }
 
@@ -906,6 +942,9 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
          return false;
       if (transport.properties != null ? !transport.properties.equals(that.transport.properties) : that.transport.properties != null)
          return false;
+      if (!memoryGuard.equals(that.memoryGuard))
+         return false;
+
       return !(transport.distributedSyncTimeout != null && !transport.distributedSyncTimeout.equals(that.transport.distributedSyncTimeout));
 
    }
@@ -927,6 +966,7 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
       result = 31 * result + (shutdown.hookBehavior.hashCode());
       result = 31 * result + serialization.version.hashCode();
       result = (int) (31 * result + transport.distributedSyncTimeout);
+      result = 31 * result + memoryGuard.hashCode();
       return result;
    }
 
@@ -944,6 +984,7 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
          if (transport != null) dolly.transport = transport.clone();
          if (serialization != null) dolly.serialization = (SerializationType) serialization.clone();
          if (shutdown != null) dolly.shutdown = (ShutdownType) shutdown.clone();
+         if (memoryGuard != null) dolly.memoryGuard = (MemoryGuardType) memoryGuard.clone();
          return dolly;
       }
       catch (CloneNotSupportedException e) {
@@ -1627,6 +1668,105 @@ public class GlobalConfiguration extends AbstractConfigurationBean {
          v.visitShutdownType(this);
       }
    }
+   
+   /**
+    * This element specifies the behavior when JVM heap memory is nearly full
+    * MemoryGuardType.
+    * 
+    * @author Dave Marion
+    * @since 5.0
+    */
+   @XmlAccessorType(XmlAccessType.PROPERTY)
+   @ConfigurationDocs( {
+            @ConfigurationDoc(name = "enabled", 
+                     desc = "Enable / disable memory guard."),
+            @ConfigurationDoc(name = "threshold", 
+                     desc = "Threshold that memory guard will begin evicting entries from the cache. Default threshold is when the used memory passes 90.0 percent of committed memory."),
+            @ConfigurationDoc(name = "pollInterval",
+                     desc = "Milliseconds between each check of used and committed memory values to determine if threshold is crossed. Default is 1000ms."),
+            @ConfigurationDoc(name = "evictionsPerCycle",
+                     desc = "Number of entries to evict from each cache every time the threshold is crossed. Default is 100 entries.")})
+   public static class MemoryGuardType extends AbstractConfigurationBeanWithGCR {
+      
+      /** The serialVersionUID */
+      private static final long serialVersionUID = 2013968220941925726L;
+
+      @ConfigurationDocRef(bean=GlobalConfiguration.class,targetElement="setEnabled")
+      protected boolean enabled = false;
+      
+      @ConfigurationDocRef(bean=GlobalConfiguration.class,targetElement="threshold")
+      protected double threshold = 90.0D;
+      
+      @ConfigurationDocRef(bean=GlobalConfiguration.class,targetElement="pollInterval")
+      protected long pollInterval = 1000L;
+      
+      @ConfigurationDocRef(bean=GlobalConfiguration.class,targetElement="evictionsPerCycle")
+      protected long evictionsPerCycle = 100L;
+      
+      @XmlAttribute
+      public void setEnabled(Boolean enabled) {
+         testImmutability("enabled");
+         this.enabled = enabled;
+      }
+
+      @XmlAttribute
+      public void setThreshold(double threshold) {
+         this.threshold = threshold;
+      }
+
+      @XmlAttribute
+      public void setPollInterval(long pollInterval) {
+         this.pollInterval = pollInterval;
+      }
+
+      @XmlAttribute
+      public void setEvictionsPerCycle(long evictionsPerCycle) {
+         this.evictionsPerCycle = evictionsPerCycle;
+      }
+
+      public boolean isEnabled() {
+         return enabled;
+      }
+
+      public double getThreshold() {
+         return threshold;
+      }
+
+      public long getPollInterval() {
+         return pollInterval;
+      }
+
+      public long getEvictionsPerCycle() {
+         return evictionsPerCycle;
+      }
+
+      public void accept(ConfigurationBeanVisitor v) {
+         v.visitMemoryGuardType(this);
+      }
+
+      @Override
+      public boolean equals(Object o) {
+         if (this == o) return true;
+         if (o == null || getClass() != o.getClass()) return false;
+
+         MemoryGuardType that = (MemoryGuardType) o;
+         if ((this.enabled == that.enabled) && (this.threshold == that.threshold) && 
+                  (this.evictionsPerCycle == that.evictionsPerCycle) && (this.pollInterval == that.pollInterval))
+            return true;
+         return false;
+
+      }
+
+      @Override
+      public int hashCode() {
+        int result = enabled ? 1 : 0;
+        result += 31 * this.threshold;
+        result += 31 * this.pollInterval;
+        result += 31 * this.evictionsPerCycle;
+        return result;
+      }
+      
+   }   
 }
 
 abstract class AbstractConfigurationBeanWithGCR extends AbstractConfigurationBean {

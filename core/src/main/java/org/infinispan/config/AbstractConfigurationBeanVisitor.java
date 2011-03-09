@@ -39,6 +39,7 @@ import org.infinispan.config.Configuration.TransactionType;
 import org.infinispan.config.Configuration.UnsafeType;
 import org.infinispan.config.GlobalConfiguration.FactoryClassWithPropertiesType;
 import org.infinispan.config.GlobalConfiguration.GlobalJmxStatisticsType;
+import org.infinispan.config.GlobalConfiguration.MemoryGuardType;
 import org.infinispan.config.GlobalConfiguration.SerializationType;
 import org.infinispan.config.GlobalConfiguration.ShutdownType;
 import org.infinispan.config.GlobalConfiguration.TransportType;
@@ -198,6 +199,10 @@ public abstract class AbstractConfigurationBeanVisitor implements ConfigurationB
    }
 
    public void defaultVisit(AbstractConfigurationBean c) {
+   }
+   
+   public void visitMemoryGuardType(MemoryGuardType bean) {
+      defaultVisit(bean);
    }
 
 }

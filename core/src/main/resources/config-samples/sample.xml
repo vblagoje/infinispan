@@ -171,6 +171,19 @@
          hookBehavior: DEFAULT, REGISTER, DONT_REGISTER
       -->
       <!-- <shutdown hookBehavior="DEFAULT"/> -->
+      
+      <!--
+         Memory Guard configuration. The Memory Guard will attempt to prevent OutOfMemory errors in the cache by evicting entries
+         from the cache when the amount of memory in the JVM crosses the specified threshold. Memory Guard is disabled by default
+         and it's attributes have the following default values:
+         
+         	threshold - 90.0 (90% of committed JVM memory) *If you don't want to evict as memory is allocated in the JVM, then
+         	                                                set Xms equals to Xmx.
+         	pollInterval - 1000 (number of milliseconds between memory usage checks)
+         	evictionsPerCycle - 100 (number of entries to evict from the cache if the threshold has been crossed when checked)
+         	
+       <memoryGuard evictionsPerCycle="100" pollInterval="1000" threshold="90.0" />
+       -->
    </global>
 
    <!--

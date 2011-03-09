@@ -5,6 +5,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import org.infinispan.config.Configuration;
+import org.infinispan.config.GlobalConfiguration;
 import org.infinispan.manager.EmbeddedCacheManager;
 import org.infinispan.notifications.Listener;
 import org.infinispan.notifications.cachelistener.annotation.CacheEntryEvicted;
@@ -17,7 +18,7 @@ import org.testng.annotations.Test;
 @Test(groups = "functional", testName = "eviction.BaseEvictionFunctionalTest")
 public abstract class BaseEvictionFunctionalTest extends SingleCacheManagerTest {
    
-   private static final int CACHE_SIZE=128;
+   protected static final int CACHE_SIZE=128;
    
    protected BaseEvictionFunctionalTest() {
       cleanup = CleanupPhase.AFTER_METHOD;
@@ -80,10 +81,11 @@ public abstract class BaseEvictionFunctionalTest extends SingleCacheManagerTest 
       assert cache.getAdvancedCache().getDataContainer().size() <= CACHE_SIZE : "Expected 1, was " + cache.size(); // this is what we expect the cache to be pruned to      
    }
 
-   private class Writer extends Thread {
+   protected class Writer extends Thread {
       CountDownLatch startLatch;
-      volatile boolean running = true;
+      public volatile boolean running = true;
       Random r = new Random();
+      volatile long count = 0L;
 
       public Writer(int n, CountDownLatch startLatch) {
          super("Writer-" + n);
@@ -112,7 +114,12 @@ public abstract class BaseEvictionFunctionalTest extends SingleCacheManagerTest 
             } else {
                cache.put("key" + r.nextInt(), "value", 10, TimeUnit.SECONDS);
             }
+            count++;
          }
+      }
+      
+      public long getCount() {
+         return count;
       }
    }
    

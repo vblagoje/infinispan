@@ -55,6 +55,11 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.infinispan.config.GlobalConfiguration.MemoryGuardType;
+import org.infinispan.eviction.monitor.MemoryMonitor;
+import org.infinispan.util.logging.Log;
+import org.infinispan.util.logging.LogFactory;
+
 
 /**
  * A hash table supporting full concurrency of retrievals and
@@ -111,6 +116,7 @@ import java.util.concurrent.locks.ReentrantLock;
  *
  * @since 1.5
  * @author Doug Lea
+ * @author Dave Marion
  * @param <K> the type of keys maintained by this map
  * @param <V> the type of mapped values
  */
@@ -129,7 +135,7 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
     * The default initial capacity for this table,
     * used when not otherwise specified in a constructor.
     */
-   static final int DEFAULT_MAXIMUM_CAPACITY = 512;
+   public static final int DEFAULT_MAXIMUM_CAPACITY = 512;
 
    /**
     * The default load factor for this table, used when not
@@ -186,6 +192,8 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
    transient Set<K> keySet;
    transient Set<Map.Entry<K,V>> entrySet;
    transient Collection<V> values;
+   
+   transient MemoryMonitor monitor;
 
    /* ---------------- Small Utilities -------------- */
 
@@ -317,6 +325,7 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
 
    public interface EvictionListener<K, V> {
       void onEntryEviction(Map<K, V> evicted);
+      void onMemoryGuardEviction(Map<K,V> evicted);
    }
 
    static class NullEvictionListener<K, V> implements EvictionListener<K, V> {
@@ -324,6 +333,10 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
       public void onEntryEviction(Map<K, V> evicted) {
          // Do nothing.
       }
+      public void onMemoryGuardEviction(Map<K,V> evicted) {
+         // Do Nothing
+      }
+
    }
 
    public interface EvictionPolicy<K, V> {
@@ -397,11 +410,30 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
       boolean thresholdExpired();
    }
 
-   static class NullEvictionPolicy<K, V> implements EvictionPolicy<K, V> {
+   private abstract static class BaseEvictionPolicy<K,V> implements EvictionPolicy<K,V> {
+      protected final ConcurrentLinkedQueue<HashEntry<K, V>> accessQueue;
+
+      protected BaseEvictionPolicy() {
+         accessQueue = new ConcurrentLinkedQueue<HashEntry<K, V>>();
+      }
+      
+      public ConcurrentLinkedQueue<HashEntry<K, V>> getAccessQueue() {
+         return accessQueue;
+      }
+
+      public abstract Set<HashEntry<K, V>> getEntriesToEvict(); 
+      
+   }
+
+   static class NullEvictionPolicy<K, V> extends BaseEvictionPolicy<K, V> {
+
+      public NullEvictionPolicy() {
+         super();
+      }
 
       @Override
       public void clear() {
-         // Do nothing.
+         accessQueue.clear();
       }
 
       @Override
@@ -411,6 +443,7 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
 
       @Override
       public boolean onEntryHit(HashEntry<K, V> e) {
+         accessQueue.add(e);
          return false;
       }
 
@@ -421,7 +454,8 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
 
       @Override
       public void onEntryRemove(HashEntry<K, V> e) {
-         // Do nothing.
+         while (accessQueue.remove(e))
+            continue;
       }
 
       @Override
@@ -433,10 +467,14 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
       public Eviction strategy() {
          return Eviction.NONE;
       }
+
+      @Override
+      public Set<HashEntry<K, V>> getEntriesToEvict() {
+         return new HashSet<HashEntry<K,V>>(accessQueue);
+      }
    }
 
-   static final class LRU<K, V> implements EvictionPolicy<K, V> {
-      private final ConcurrentLinkedQueue<HashEntry<K, V>> accessQueue;
+   static final class LRU<K, V> extends BaseEvictionPolicy<K, V> {
       private final Segment<K,V> segment;
       private final LinkedList<HashEntry<K, V>> lruQueue;
       private final int maxBatchQueueSize;
@@ -444,14 +482,29 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
       private final float batchThresholdFactor;
 
       public LRU(Segment<K,V> s, int capacity, float lf, int maxBatchSize, float batchThresholdFactor) {
+         super();
          this.segment = s;
          this.trimDownSize = (int) (capacity * lf);
          this.maxBatchQueueSize = maxBatchSize > MAX_BATCH_SIZE ? MAX_BATCH_SIZE : maxBatchSize;
          this.batchThresholdFactor = batchThresholdFactor;
-         this.accessQueue = new ConcurrentLinkedQueue<HashEntry<K, V>>();
          this.lruQueue = new LinkedList<HashEntry<K, V>>();
       }
 
+      @Override
+      public Set<HashEntry<K, V>> getEntriesToEvict() {
+         Set<HashEntry<K, V>> evicted = new HashSet<HashEntry<K, V>>();
+         for (HashEntry<K, V> e : accessQueue) {
+            if (lruQueue.remove(e)) {
+               lruQueue.addFirst(e);
+            }
+         }
+         while (isOverflow()) {
+            HashEntry<K, V> first = lruQueue.getLast();
+            evicted.add(first);
+         }        
+         return evicted;
+      }
+      
       @Override
       public Set<HashEntry<K, V>> execute() {
          Set<HashEntry<K, V>> evicted = Collections.emptySet();
@@ -459,15 +512,9 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
             evicted = new HashSet<HashEntry<K, V>>();
          }
          try {
-            for (HashEntry<K, V> e : accessQueue) {
-               if (lruQueue.remove(e)) {
-                  lruQueue.addFirst(e);
-               }
-            }
-            while (isOverflow()) {
-               HashEntry<K, V> first = lruQueue.getLast();
-               segment.remove(first.key, first.hash, null);
-               evicted.add(first);
+            evicted = getEntriesToEvict();
+            for (HashEntry<K, V> e : evicted) {
+               segment.remove(e.key, e.hash, null);
             }
          } finally {
             accessQueue.clear();
@@ -523,10 +570,9 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
       }
    }
 
-   static final class LIRS<K, V> implements EvictionPolicy<K, V> {
+   static final class LIRS<K, V> extends BaseEvictionPolicy<K, V> {
       private final static int MIN_HIR_SIZE = 2;
       private final Segment<K,V> segment;
-      private final ConcurrentLinkedQueue<HashEntry<K, V>> accessQueue;
       private final LinkedHashMap<K, HashEntry<K, V>> stack;
       private final LinkedList<HashEntry<K, V>> queue;
       private final int maxBatchQueueSize;
@@ -536,6 +582,7 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
       private final float batchThresholdFactor;
 
       public LIRS(Segment<K,V> s, int capacity, int maxBatchSize, float batchThresholdFactor) {
+         super();
          this.segment = s;
          int tmpLirSize = (int) (capacity * 0.9);
          int tmpHirSizeLimit = capacity - tmpLirSize;
@@ -548,24 +595,30 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
          }
          this.maxBatchQueueSize = maxBatchSize > MAX_BATCH_SIZE ? MAX_BATCH_SIZE : maxBatchSize;
          this.batchThresholdFactor = batchThresholdFactor;
-         this.accessQueue = new ConcurrentLinkedQueue<HashEntry<K, V>>();
          this.stack = new LinkedHashMap<K, HashEntry<K, V>>();
          this.queue = new LinkedList<HashEntry<K, V>>();
+      }
+
+      @Override
+      public Set<HashEntry<K, V>> getEntriesToEvict() {
+         Set<HashEntry<K, V>> evicted = new HashSet<HashEntry<K, V>>();
+         for (HashEntry<K, V> e : accessQueue) {
+            if (present(e)) {
+               if (e.recency() == Recency.LIR_RESIDENT) {
+                  handleLIRHit(e, evicted);
+               } else if (e.recency() == Recency.HIR_RESIDENT) {
+                  handleHIRHit(e, evicted);
+               }
+            }
+         }
+         return evicted;
       }
 
       @Override
       public Set<HashEntry<K, V>> execute() {
          Set<HashEntry<K, V>> evicted = new HashSet<HashEntry<K, V>>();
          try {
-            for (HashEntry<K, V> e : accessQueue) {
-               if (present(e)) {
-                  if (e.recency() == Recency.LIR_RESIDENT) {
-                     handleLIRHit(e, evicted);
-                  } else if (e.recency() == Recency.HIR_RESIDENT) {
-                     handleHIRHit(e, evicted);
-                  }
-               }
-            }
+            evicted = getEntriesToEvict();
             removeFromSegment(evicted);
          } finally {
             accessQueue.clear();
@@ -717,6 +770,84 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
     * simplify some locking and avoid separate construction.
     */
    static final class Segment<K,V> extends ReentrantLock {
+
+      /**
+       * 
+       * Class created per segment that is used to evict entries from the segment if the memory threshold has
+       * been crossed.
+       * 
+       * @author Dave Marion
+       * @since 5.0
+       */
+      class MemoryGuard {
+         
+         private final Log log = LogFactory.getLog(MemoryGuard.class);
+
+         private BaseEvictionPolicy<K,V> policy = null;
+         
+         private long evictionsPerCycle = 0L;
+         
+         private MemoryMonitor monitor = null;
+         
+         private volatile long lastUsedValue = 0L;
+         
+         private volatile long previousVersion = 0L;
+         
+         private volatile long evictions = 0L;
+         
+         public MemoryGuard(BaseEvictionPolicy<K,V> policy, MemoryMonitor monitor, long evictionsPerCycle) {
+            this.monitor = monitor;
+            this.policy = policy;
+            this.evictionsPerCycle  = evictionsPerCycle;
+            previousVersion = monitor.getVersion();
+         }
+         
+         public void evict() {
+            //Don't evict in the same version of the monitor cycle
+            long currentVersion = monitor.getVersion();
+            //Don't evict if the current used heap value is less than the last.
+            long currentUsedValue = monitor.getUsedValue();
+            //Only get in here if the we are past the threshold and the amount of used memory is greater than
+            //or equal to the last used value.
+            if (monitor.isThresholdCrossed() && (currentUsedValue >= lastUsedValue) && (currentVersion > previousVersion)) {
+              Set<HashEntry<K, V>> entries = policy.getEntriesToEvict();
+              Map<K,V> evicted = new HashMap<K,V>((int) evictionsPerCycle);
+              int count = 0;
+              for (HashEntry<K, V> e : entries) {
+                  if (count >= this.evictionsPerCycle)
+                     break;
+                  //remove from the segment
+                  remove(e.key, e.hash, null);
+                  //remove from the access queue
+                  policy.getAccessQueue().remove(e);
+                  //Add to map of evictions for notification
+                  evicted.put(e.key, e.value);
+                  count++;
+                  evictions++;
+               }
+              if (evicted.size() > 0) {
+                 //perform notifications
+                 evictionListener.onMemoryGuardEviction(evicted);
+              }
+              
+              if (log.isDebugEnabled())
+                  log.debug("Removed " + count + " entries from segment");
+            }
+            lastUsedValue = currentUsedValue;
+            previousVersion = currentVersion;
+            
+         }
+         
+         public long getEntriesEvicted() {
+            return evictions;
+         }
+         
+         public void reset() {
+            evictions = 0L;
+         }
+         
+      }//End of MemoryGuard
+
       /*
        * Segments maintain a table of entry lists that are ALWAYS
        * kept in a consistent state, so can be read without locking.
@@ -794,12 +925,26 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
       transient final EvictionPolicy<K, V> eviction;
 
       transient final EvictionListener<K, V> evictionListener;
+      
+      transient MemoryGuard guard;
 
-      Segment(int cap, float lf, Eviction es, EvictionListener<K, V> listener) {
+      Segment(int cap, float lf, Eviction es, EvictionListener<K, V> listener, MemoryMonitor monitor, long evictions) {
          loadFactor = lf;
          eviction = es.make(this, cap, lf);
          evictionListener = listener;
          setTable(HashEntry.<K, V> newArray(cap));
+         
+         if (null != monitor && evictions > 0) {
+            if (eviction instanceof BaseEvictionPolicy) {
+               //This should always be true
+               BaseEvictionPolicy<K,V> policy = (BaseEvictionPolicy<K,V>) eviction;
+               guard = new MemoryGuard(policy, monitor, evictions);
+            }
+         }
+      }
+      
+      MemoryGuard getMemoryGuard() {
+         return guard;
       }
 
       @SuppressWarnings("unchecked")
@@ -909,6 +1054,12 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
       }
 
       boolean replace(K key, int hash, V oldValue, V newValue) {
+         if (null != guard)
+            guard.evict();
+         return innerReplace(key, hash, oldValue, newValue);
+      }
+      
+      private boolean innerReplace(K key, int hash, V oldValue, V newValue) {
          lock();
          Set<HashEntry<K, V>> evicted = null;
          try {
@@ -933,6 +1084,12 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
       }
 
       V replace(K key, int hash, V newValue) {
+         if (null != guard)
+            guard.evict();
+         return innerReplace(key, hash, newValue);
+      }
+      
+      private V innerReplace(K key, int hash, V newValue) {
          lock();
          Set<HashEntry<K, V>> evicted = null;
          try {
@@ -955,8 +1112,14 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
             notifyEvictionListener(evicted);
          }
       }
-
+      
       V put(K key, int hash, V value, boolean onlyIfAbsent) {
+         if (null != guard)
+            guard.evict();
+         return innerPut(key, hash, value, onlyIfAbsent);
+      }
+
+      private V innerPut(K key, int hash, V value, boolean onlyIfAbsent) {
          lock();
          Set<HashEntry<K, V>> evicted = null;
          try {
@@ -1003,6 +1166,8 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
                   }
                } else {
                   tab[index] = new HashEntry<K, V>(key, hash, first, value);
+                  //Null eviction policy, notify hit to add to accesss queue
+                  eviction.onEntryHit(tab[index]);
                }
             }
             return oldValue;
@@ -1199,12 +1364,15 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
     * @param evictionListener
     *            the evicton listener callback to be notified about evicted elements
     *
+    * @param memoryGuard
+    *            the memory guard configuration
+    *            
     * @throws IllegalArgumentException
     *             if the initial capacity is negative or the load factor or concurrencyLevel are
     *             nonpositive.
     */
    public BoundedConcurrentHashMap(int capacity, int concurrencyLevel,
-         Eviction evictionStrategy, EvictionListener<K, V> evictionListener) {
+         Eviction evictionStrategy, EvictionListener<K, V> evictionListener, MemoryGuardType memoryGuard) {
       if (capacity < 0 || concurrencyLevel <= 0) {
          throw new IllegalArgumentException();
       }
@@ -1248,8 +1416,21 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
          cap <<= 1;
       }
 
-      for (int i = 0; i < this.segments.length; ++i) {
-         this.segments[i] = new Segment<K, V>(cap, DEFAULT_LOAD_FACTOR, evictionStrategy, evictionListener);
+      long evictionsPerSegment = 0;
+      if (null != memoryGuard && memoryGuard.isEnabled()) {
+         //evictionsPerCycle is for the entire cache, need to determine how many per segment.
+         evictionsPerSegment = Math.round(memoryGuard.getEvictionsPerCycle() / this.segments.length);
+         //Make sure we evict at least one entry
+         evictionsPerSegment = Math.max(1, evictionsPerSegment);
+         monitor = MemoryMonitor.getInstance(memoryGuard.getThreshold(), memoryGuard.getPollInterval());
+      }
+      try {
+         for (int i = 0; i < this.segments.length; ++i) {
+            this.segments[i] = new Segment<K, V>(cap, DEFAULT_LOAD_FACTOR, evictionStrategy, evictionListener, monitor, evictionsPerSegment);
+         }
+      }
+      catch (OutOfMemoryError oom) {
+         throw new OutOfMemoryError("Not enough memory to create cache with capacity of " + cap + " entries.");
       }
    }
 
@@ -1291,7 +1472,7 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
     *             nonpositive.
     */
    public BoundedConcurrentHashMap(int capacity, int concurrencyLevel, Eviction evictionStrategy) {
-      this(capacity, concurrencyLevel, evictionStrategy, new NullEvictionListener<K, V>());
+      this(capacity, concurrencyLevel, evictionStrategy, new NullEvictionListener<K, V>(), new MemoryGuardType());
    }
 
    /**
@@ -1736,6 +1917,13 @@ public class BoundedConcurrentHashMap<K, V> extends AbstractMap<K, V>
     */
    public Enumeration<V> elements() {
       return new ValueIterator();
+   }
+   
+   public long getNumMemoryGuardEvictions() {
+      long evictions = 0L;
+      for (Segment<K,V> segment : segments)
+         evictions += segment.getMemoryGuard().getEntriesEvicted();
+      return evictions;
    }
 
    /* ---------------- Iterator Support -------------- */

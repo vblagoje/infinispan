@@ -104,4 +104,8 @@ public class QueryableDataContainer implements DataContainer {
 	   return loggedOperations;
    }
 
+   @Override
+   public long getMemoryGuardEvictions() {      
+      return 0;
+   }
 }

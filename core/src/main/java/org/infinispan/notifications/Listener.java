@@ -93,6 +93,10 @@ import java.lang.annotation.Target;
  * org.infinispan.notifications.cachelistener.annotation.CacheEntryInvalidated}</td> <td valign=@"top">{@link
  * org.infinispan.notifications.cachelistener.event.CacheEntryInvalidatedEvent}</td> <td valign="top">A cache entry was
  * invalidated by a remote cache.  Only if cache mode is INVALIDATION_SYNC or INVALIDATION_ASYNC.</td> </tr>
+ * <tr><td valign="top">{@link org.infinispan.notifications.cachelistener.annotation.CacheEntryMemoryGuardEvicted}</td>
+ * <td valign="top">{@link org.infinispan.notifications.cachelistener.event.CacheEntryMemoryGuardEvictionEvent}</td><td>A cache entry was
+ * evicted by the MemoryGuard. A cache entry referenced in a CacheEntryMemoryGuardEvictionEvent event may also be referenced in a 
+ * CacheEntryEvictedEvent</td></tr>
  * <p/>
  * </table>
  * <p/>

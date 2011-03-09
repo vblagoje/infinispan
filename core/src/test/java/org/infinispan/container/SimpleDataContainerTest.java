@@ -1,5 +1,6 @@
 package org.infinispan.container;
 
+import org.infinispan.config.GlobalConfiguration.MemoryGuardType;
 import org.infinispan.container.entries.ImmortalCacheEntry;
 import org.infinispan.container.entries.InternalCacheEntry;
 import org.infinispan.container.entries.MortalCacheEntry;
@@ -30,7 +31,7 @@ public class SimpleDataContainerTest extends AbstractInfinispanTest {
    }
 
    protected DataContainer createContainer() {
-      return new DefaultDataContainer(16);
+      return new DefaultDataContainer(16, new MemoryGuardType());
    }
 
    public void testExpiredData() throws InterruptedException {

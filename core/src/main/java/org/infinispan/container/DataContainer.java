@@ -127,4 +127,10 @@ public interface DataContainer extends Iterable<InternalCacheEntry> {
     * Purges entries that have passed their expiry time
     */
    void purgeExpired();
+   
+   /**
+    * 
+    * @return number of entries evicted by the container or 0 if memory guard not enabled or not supported by the underlying implemention. 
+    */
+   long getMemoryGuardEvictions();
 }
