@@ -32,17 +32,25 @@ import org.infinispan.Cache;
 import org.infinispan.config.Configuration;
 import org.infinispan.test.MultipleCacheManagersTest;
 import org.infinispan.test.TestingUtil;
+import org.infinispan.transaction.TransactionMode;
 import org.testng.annotations.Test;
 
+/**
+ * @author Vladimir Blagojevic (C) 2011 Red Hat Inc.
+ * @author Sanne Grinovero (C) 2011 Red Hat Inc.
+ */
 @Test(groups = "functional", testName = "atomic.FineGrainedAtomicMapAPITest")
 public class FineGrainedAtomicMapAPITest extends MultipleCacheManagersTest {
 
    protected void createCacheManagers() throws Throwable {
-      Configuration c = getDefaultClusteredConfig(Configuration.CacheMode.REPL_SYNC, true);
-      c.setInvocationBatchingEnabled(true);
+      Configuration c = getDefaultClusteredConfig(Configuration.CacheMode.REPL_SYNC, true)
+            .fluent()
+               .transaction()
+                  .transactionMode(TransactionMode.TRANSACTIONAL)
+            .build();
       createClusteredCaches(2, "atomic", c);
    }
-   
+
    @Test(enabled=true)
    public void testMultipleTx() throws Exception{
       final Cache<String, Object> cache1 = cache(0, "atomic");
@@ -88,9 +96,60 @@ public class FineGrainedAtomicMapAPITest extends MultipleCacheManagersTest {
       assert map1.get("k3").equals("v3");
       assert map1.get("k4").equals("v4");
       assert map1.get("k5").equals("v5");
-      assert map1.get("k6").equals("v6");     
+      assert map1.get("k6").equals("v6");
    }
-   
+
+   @Test(enabled=true)
+   public void testSizeOnCache() throws Exception {
+      final Cache<String, Object> cache1 = cache(0, "atomic");
+      assert cache1.size() == 0;
+      cache1.put("Hi", "Someone");
+      assert cache1.size() == 1;
+
+      tm(0, "atomic").begin();
+      assert cache1.size() == 1;
+      cache1.put("Need", "Read Consistency");
+      assert cache1.size() == 2;
+      tm(0, "atomic").commit();
+      assert cache1.size() == 2;
+
+      tm(0, "atomic").begin();
+      assert cache1.size() == 2;
+      cache1.put("Need Also", "Speed");
+      assert cache1.size() == 3;
+      tm(0, "atomic").rollback();
+      assert cache1.size() == 2;
+
+      FineGrainedAtomicMap<Object,Object> atomicMap = AtomicMapLookup.getFineGrainedAtomicMap(cache1, "testSizeOnCache", true);
+      assert cache1.size() == 3;
+      atomicMap.put("mm", "nn");
+      assert cache1.size() == 3;
+
+      tm(0, "atomic").begin();
+      assert cache1.size() == 3;
+      atomicMap = AtomicMapLookup.getFineGrainedAtomicMap(cache1, "testSizeOnCache-second", true);
+      assert cache1.size() == 4;
+      atomicMap.put("mm", "nn");
+      assert cache1.size() == 4 : "Cache size is actually " + cache1.size();
+      tm(0, "atomic").commit();
+      assert cache1.size() == 4;
+
+      tm(0, "atomic").begin();
+      assert cache1.size() == 4;
+      atomicMap = AtomicMapLookup.getFineGrainedAtomicMap(cache1, "testSizeOnCache-third", true);
+      assert cache1.size() == 5;
+      atomicMap.put("mm", "nn");
+      assert cache1.size() == 5 : "Cache size is actually " + cache1.size();
+      atomicMap.put("ooo", "weird!");
+      assert cache1.size() == 5 : "Cache size is actually " + cache1.size();
+      atomicMap = AtomicMapLookup.getFineGrainedAtomicMap(cache1, "testSizeOnCache-onemore", true);
+      assert cache1.size() == 6 : "Cache size is actually " + cache1.size();
+      atomicMap.put("even less?", "weird!");
+      assert cache1.size() == 6 : "Cache size is actually " + cache1.size();
+      tm(0, "atomic").rollback();
+      assert cache1.size() == 4;
+   }
+
    @Test(enabled=true)
    public void testRollback() throws Exception {
       final Cache<String, Object> cache1 = cache(0, "atomic");
