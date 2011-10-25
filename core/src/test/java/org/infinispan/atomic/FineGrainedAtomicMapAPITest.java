@@ -312,7 +312,7 @@ public class FineGrainedAtomicMapAPITest extends MultipleCacheManagersTest {
       assert map.size() == 4;
       assert map.get("blah").equals("toronto");
    }
-   
+
    @Test(enabled=true)
    public void testConcurrentTx() throws Exception {
       final Cache<String, Object> cache1 = cache(0, "atomic");
