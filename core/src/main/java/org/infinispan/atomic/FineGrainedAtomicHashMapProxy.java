@@ -39,7 +39,6 @@ import org.infinispan.context.InvocationContextContainer;
 import org.infinispan.util.logging.Log;
 import org.infinispan.util.logging.LogFactory;
 
-
 /**
  * A layer of indirection around an {@link FineGrainedAtomicMap} to provide consistency and isolation for concurrent readers
  * while writes may also be going on.  The techniques used in this implementation are very similar to the lock-free
@@ -57,20 +56,21 @@ import org.infinispan.util.logging.LogFactory;
  * @since 5.1
  */
 public class FineGrainedAtomicHashMapProxy<K, V> extends AtomicHashMapProxy<K, V> implements FineGrainedAtomicMap<K,V> {
+
    private static final Log log = LogFactory.getLog(FineGrainedAtomicHashMapProxy.class);
    private static final boolean trace = log.isTraceEnabled();
-   
+
    FineGrainedAtomicHashMapProxy(AdvancedCache<?, ?> cache, Object deltaMapKey, BatchContainer batchContainer, InvocationContextContainer icc) {
      super(cache,deltaMapKey,batchContainer,icc);
    }
-   
+
    @SuppressWarnings("unchecked")
    protected AtomicHashMap<K, V> getDeltaMapForWrite(InvocationContext ctx) {
       CacheEntry lookedUpEntry = ctx.lookupEntry(deltaMapKey);
       boolean lockedAndCopied = lookedUpEntry != null && lookedUpEntry.isChanged() &&
-            toMap(lookedUpEntry.getValue()).copied;          
+            toMap(lookedUpEntry.getValue()).copied;
 
-      if (lockedAndCopied) {         
+      if (lockedAndCopied) {
          return getDeltaMapForRead();
       } else {
          // acquire WL
@@ -90,41 +90,39 @@ public class FineGrainedAtomicHashMapProxy<K, V> extends AtomicHashMapProxy<K, V
          AtomicHashMap<K, V> map = getDeltaMapForRead();
          boolean insertNewMap = map == null;
          // copy for write
-         AtomicHashMap<K, V> copy = insertNewMap ? new AtomicHashMap<K, V>(true) : map.copyForWrite();          
-         copy.initForWriting();                 
-         if(insertNewMap){
+         AtomicHashMap<K, V> copy = insertNewMap ? new AtomicHashMap<K, V>(true) : map.copyForWrite();
+         copy.initForWriting();
+         if (insertNewMap) {
             cache.put(deltaMapKey, copy);
          }
          return copy;
       }
    }
 
- 
    public Set<K> keySet() {
       AtomicHashMap<K, V> map = getDeltaMapForRead();
       Set<K> result = new HashSet<K>(keySetUncommitted());
-      if(map != null){
+      if (map != null) {
          result.addAll(map.keySet());
       }
       return result;
    }
-   
+
    @SuppressWarnings("unchecked")
    private Set<K> keySetUncommitted() {
       DeltaAwareCacheEntry entry = lookupEntry();
       return entry != null ? entry.getUncommittedChages().keySet(): Collections.<K>emptySet() ;
    }
-  
 
    public Collection<V> values() {
       AtomicHashMap<K, V> map = getDeltaMapForRead();
       Set<V> result = new HashSet<V>(valuesUncommitted());
-      if(map != null){
+      if (map != null) {
          result.addAll(map.values());
       }
       return result;
    }
-   
+
    @SuppressWarnings("unchecked")
    private Collection<V> valuesUncommitted() {
       DeltaAwareCacheEntry entry = lookupEntry();
@@ -134,31 +132,31 @@ public class FineGrainedAtomicHashMapProxy<K, V> extends AtomicHashMapProxy<K, V
    public Set<Entry<K, V>> entrySet() {
       AtomicHashMap<K, V> map = getDeltaMapForRead();
       Set<Entry<K, V>> result = new HashSet<Entry<K, V>>(entrySetUncommitted());
-      if(map != null){
+      if (map != null) {
          result.addAll(map.entrySet());
       }
       return result;
    }
-   
+
    @SuppressWarnings("unchecked")
    private Set<Entry<K, V>> entrySetUncommitted() {
       DeltaAwareCacheEntry entry = lookupEntry();
       return entry != null ? entry.getUncommittedChages().entrySet(): Collections.<V>emptySet() ;
    }
 
-   public int size() {      
+   public int size() {
       AtomicHashMap<K, V> map = getDeltaMapForRead();
       int su = sizeUncommitted();
       return map == null ? su : su + map.size();
    }
-   
-   public int sizeUncommitted(){
+
+   public int sizeUncommitted() {
       DeltaAwareCacheEntry entry = lookupEntry();
-      return entry != null ? entry.getUncommittedChages().size():0;
+      return entry != null ? entry.getUncommittedChages().size() : 0;
    }
 
    public boolean isEmpty() {
-      AtomicHashMap<K, V> map = getDeltaMapForRead();            
+      AtomicHashMap<K, V> map = getDeltaMapForRead();
       return isEmptyUncommitted() && (map == null || map.isEmpty());
    }
 
@@ -172,7 +170,7 @@ public class FineGrainedAtomicHashMapProxy<K, V> extends AtomicHashMapProxy<K, V
       AtomicHashMap<K, V> map = getDeltaMapForRead();
       return containsKeyUncommitted(key) || (map != null && map.containsKey(key));
    }
-   
+
    private boolean containsKeyUncommitted(Object key) {
       DeltaAwareCacheEntry entry = lookupEntry();
       return entry != null && entry.getUncommittedChages().containsKey(key);
@@ -182,13 +180,13 @@ public class FineGrainedAtomicHashMapProxy<K, V> extends AtomicHashMapProxy<K, V
       AtomicHashMap<K, V> map = getDeltaMapForRead();
       return containsValueUncommitted(value) || (map != null && map.containsValue(value));
    }
-   
+
    private boolean containsValueUncommitted(Object value) {
       DeltaAwareCacheEntry entry = lookupEntry();
       return entry != null && entry.getUncommittedChages().containsValue(value);
    } 
 
-   public V get(Object key) {      
+   public V get(Object key) {
       V result = getUncommitted(key);
       if (result == null) {
          AtomicHashMap<K, V> map = getDeltaMapForRead();
@@ -196,7 +194,7 @@ public class FineGrainedAtomicHashMapProxy<K, V> extends AtomicHashMapProxy<K, V
       }
       return result;
    }
-   
+
    @SuppressWarnings("unchecked")
    public V getUncommitted(Object key) {
       DeltaAwareCacheEntry entry = lookupEntry();
@@ -255,17 +253,17 @@ public class FineGrainedAtomicHashMapProxy<K, V> extends AtomicHashMapProxy<K, V
          endAtomic();
       }
    }
-   
-   private DeltaAwareCacheEntry lookupEntry(){
+
+   private DeltaAwareCacheEntry lookupEntry() {
       InvocationContext context = icc.createInvocationContext(false);
-      CacheEntry entry = context.lookupEntry(deltaMapKey);      
-      if(entry instanceof DeltaAwareCacheEntry){
-         return (DeltaAwareCacheEntry)entry;         
+      CacheEntry entry = context.lookupEntry(deltaMapKey);
+      if (entry instanceof DeltaAwareCacheEntry) {
+         return (DeltaAwareCacheEntry)entry;
       } else {
          return null;
       }
    }
-   
+
    private void invokeApplyDelta(AtomicHashMapDelta delta) {
       Collection keys = Collections.emptyList();
       if (delta.hasClearOperation()) {
@@ -282,7 +280,7 @@ public class FineGrainedAtomicHashMapProxy<K, V> extends AtomicHashMapProxy<K, V
 
    @Override
    public String toString() {
-      StringBuffer sb = new StringBuffer("FineGrainedAtomicHashMapProxy{deltaMapKey=");      
+      StringBuilder sb = new StringBuilder("FineGrainedAtomicHashMapProxy{deltaMapKey=");
       sb.append(deltaMapKey);
       sb.append("}");
       return sb.toString();
