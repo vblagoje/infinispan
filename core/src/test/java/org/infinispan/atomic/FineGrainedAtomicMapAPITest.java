@@ -24,8 +24,10 @@ package org.infinispan.atomic;
 
 import java.util.Collection;
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.Set;
 
+import javax.transaction.RollbackException;
 import javax.transaction.TransactionManager;
 
 import org.infinispan.Cache;
@@ -148,6 +150,75 @@ public class FineGrainedAtomicMapAPITest extends MultipleCacheManagersTest {
       assert cache1.size() == 6 : "Cache size is actually " + cache1.size();
       tm(0, "atomic").rollback();
       assert cache1.size() == 4;
+   }
+
+   @Test(enabled=true)
+   public void testConcurrentReadsOnExistingMap() throws Exception {
+      final Cache<String, Object> cache1 = cache(0, "atomic");
+      assert cache1.size() == 0;
+      final FineGrainedAtomicMap<String, String> map = AtomicMapLookup.getFineGrainedAtomicMap(cache1, "testConcurrentReadsOnExistingMap", true);
+      map.put("the-1", "my preciousss");
+      tm(0, "atomic").begin();
+      assert "my preciousss".equals(map.get("the-1"));
+      final AtomicBoolean allok = new AtomicBoolean(false);
+      map.put("the-2", "a minor");
+
+      fork(new Runnable() {
+         @Override
+         public void run() {
+            try {
+               tm(0, "atomic").begin();
+               FineGrainedAtomicMap<String, String> map = AtomicMapLookup.getFineGrainedAtomicMap(cache1, "testConcurrentReadsOnExistingMap", true);
+               assert "my preciousss".equals(map.get("the-1"));
+               assert ! map.containsKey("the-2");
+               tm(0, "atomic").commit();
+               allok.set(true);
+            } catch (Exception e) {
+               log.error("Unexpected error performing transaction", e);
+            }
+         }
+      }, true);
+
+      tm(0, "atomic").commit();
+      assert allok.get();
+   }
+
+   @Test(enabled=true)
+   public void testConcurrentWritesOnExistingMap() throws Exception {
+      final Cache<String, Object> cache1 = cache(0, "atomic");
+      assert cache1.size() == 0;
+      final FineGrainedAtomicMap<String, String> map = AtomicMapLookup.getFineGrainedAtomicMap(cache1, "testConcurrentReadsOnExistingMap", true);
+      map.put("the-1", "my preciousss");
+      tm(0, "atomic").begin();
+      assert "my preciousss".equals(map.get("the-1"));
+      final AtomicBoolean allok = new AtomicBoolean(false);
+      map.put("the-2", "a minor");
+
+      fork(new Runnable() {
+         @Override
+         public void run() {
+            try {
+               tm(0, "atomic").begin();
+               FineGrainedAtomicMap<String, String> map = AtomicMapLookup.getFineGrainedAtomicMap(cache1, "testConcurrentReadsOnExistingMap", true);
+               assert "my preciousss".equals(map.get("the-1"));
+               assert ! map.containsKey("the-2");
+               map.put("the-2", "a minor-different"); // We're in optimistic locking, this change should conflict with the first transaction and have it rollback
+               tm(0, "atomic").commit();
+               allok.set(true);
+            } catch (Exception e) {
+               log.error("Unexpected error performing transaction", e);
+            }
+         }
+      }, true);
+      assert allok.get();
+
+      try {
+         tm(0, "atomic").commit();
+         assert false : "should have rolled back because of conflicting commit";
+      }
+      catch (RollbackException re) {
+         //expected
+      }
    }
 
    @Test(enabled=true)
@@ -312,7 +383,7 @@ public class FineGrainedAtomicMapAPITest extends MultipleCacheManagersTest {
       assert map.size() == 4;
       assert map.get("blah").equals("toronto");
    }
-   
+
    @Test(enabled=true)
    public void testConcurrentTx() throws Exception {
       final Cache<String, Object> cache1 = cache(0, "atomic");
