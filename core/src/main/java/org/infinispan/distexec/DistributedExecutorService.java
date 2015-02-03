@@ -8,7 +8,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
-import org.infinispan.commons.util.concurrent.FutureListener;
 import org.infinispan.commons.util.concurrent.NotifyingFuture;
 import org.infinispan.remoting.transport.Address;
 

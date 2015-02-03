@@ -163,6 +163,7 @@ public class MapReduceTask<KIn, VIn, KOut, VOut> {
    protected String customIntermediateCacheName;
    protected String intermediateCacheConfigurationName = DEFAULT_TMP_CACHE_CONFIGURATION_NAME;
    private StateTransferManager stateTransferManager;
+   private MapReduceTaskStatsImpl stats;
    private static final int MAX_COLLECTOR_SIZE = 1000;
 
    /**
@@ -237,6 +238,7 @@ public class MapReduceTask<KIn, VIn, KOut, VOut> {
       if (!isLocalOnly) {
          this.rpcOptionsBuilder.timeout(0, TimeUnit.MILLISECONDS);
       }
+      stats = new MapReduceTaskStatsImpl(taskId.toString());
    }
 
    /**
@@ -456,6 +458,7 @@ public class MapReduceTask<KIn, VIn, KOut, VOut> {
    }
 
    protected Map<KOut, VOut> executeHelper(String resultCache) throws NullPointerException, MapReduceException {
+      stats.setStartTime(System.currentTimeMillis());
       ensureAccessPermissions(cache);
       if (mapper == null)
          throw new NullPointerException("A valid reference of Mapper is not set " + mapper);
@@ -479,6 +482,7 @@ public class MapReduceTask<KIn, VIn, KOut, VOut> {
             throw new MapReduceException(ie);
          }
          finally {
+            stats.setEndTime(System.currentTimeMillis());
             // cleanup tmp caches across cluster
             EmbeddedCacheManager cm = cache.getCacheManager();
             String intermediateCache = getIntermediateCacheName();
@@ -507,6 +511,8 @@ public class MapReduceTask<KIn, VIn, KOut, VOut> {
          } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
             throw new MapReduceException(ie);
+         } finally {
+            stats.setEndTime(System.currentTimeMillis());
          }
       }
       return result;
@@ -553,7 +559,7 @@ public class MapReduceTask<KIn, VIn, KOut, VOut> {
          future.get();
       } catch (Exception e) {
          throw new MapReduceException(e);
-      }      
+      }
       Map<Address, Response> map = rpc.invokeRemotely(cache.getRpcManager().getMembers(), ccc, rpcOptionsBuilder.build());
       for (Entry<Address, Response> e : map.entrySet()) {
          if (!e.getValue().isSuccessful()) {
@@ -598,12 +604,15 @@ public class MapReduceTask<KIn, VIn, KOut, VOut> {
             futures.add(part);
          }
       }
+      stats.setTotalMapTaskCount(futures.size());
       try {
          for (MapTaskPart<Set<KOut>> mapTaskPart : futures) {
             Set<KOut> result = null;
             try {
                result = mapTaskPart.get();
+               stats.increaseMapTaskCompleted();
             } catch (ExecutionException ee) {
+               stats.increaseFailedMapAttempts();
                throw new MapReduceException("Map phase failed ", ee.getCause());
             }
             mapPhasesResult.addAll(result);
@@ -656,12 +665,15 @@ public class MapReduceTask<KIn, VIn, KOut, VOut> {
             futures.add(part);
          }
       }
+      stats.setTotalMapTaskCount(futures.size());
       try {
          for (MapTaskPart<Map<KOut, List<VOut>>> mapTaskPart : futures) {
             Map<KOut, List<VOut>> result = null;
             try {
                result = mapTaskPart.get();
+               stats.increaseMapTaskCompleted();
             } catch (ExecutionException ee) {
+               stats.increaseFailedMapAttempts();
                throw new MapReduceException("Map phase failed ", ee.getCause());
             }
             mergeResponse(mapPhasesResult, result);
@@ -717,12 +729,15 @@ public class MapReduceTask<KIn, VIn, KOut, VOut> {
          part.execute();
          reduceTasks.add(part);
       }
+      stats.setTotalReduceTaskCount(reduceTasks.size());
       try {
          for (ReduceTaskPart<Map<KOut, VOut>> reduceTaskPart : reduceTasks) {
             Map<KOut, VOut> result = null;
             try {
                result = reduceTaskPart.get();
+               stats.increaseReduceTaskCompleted();
             } catch (ExecutionException ee) {
+               stats.increaseFailedReduceAttempts();
                throw new MapReduceException("Reduce phase failed", ee.getCause());
             }
             reduceResult.putAll(result);
@@ -1254,5 +1269,138 @@ public class MapReduceTask<KIn, VIn, KOut, VOut> {
    private interface CancellableTaskPart {
       UUID getUUID();
       Address getExecutionTarget();
+   }
+
+   public class MapReduceTaskStatsImpl implements MapReduceTaskStats {
+
+      private final String taskId;
+      private String state = STATE_INITIALIZED;
+      private int totalMapTaskCount;
+      private int mapsCompleted;
+      private int totalReduceTaskCount;
+      private int reducesCompleted;
+      private int failedMapAttempts;
+      private int failedReduceAttempts;
+
+      private long startTime;
+      private long endTime;
+
+      public MapReduceTaskStatsImpl(String taskId) {
+         super();
+         this.taskId = taskId;
+      }
+
+      @Override
+      public double mapProgress() {
+         if (totalMapTaskCount > 0) {
+            return mapsCompleted / totalMapTaskCount;
+         } else {
+            return 0;
+         }
+      }
+
+      void setStartTime(long startTime) {
+         this.startTime = startTime;
+         this.state = STATE_RUNNING;
+      }
+
+      void setEndTime(long endTime) {
+         this.endTime = endTime;
+         this.state = STATE_COMPLETED;
+      }
+
+      @Override
+      public double reduceProgress() {
+         if (totalReduceTaskCount > 0) {
+            return reducesCompleted / totalReduceTaskCount;
+         } else {
+            return 0;
+         }
+      }
+
+      @Override
+      public int failedMapAttempts() {
+         return failedMapAttempts;
+      }
+
+      void increaseFailedMapAttempts() {
+         failedMapAttempts += 1;
+      }
+
+      void increaseFailedReduceAttempts() {
+         failedReduceAttempts += 1;
+      }
+
+      @Override
+      public int failedReduceAttempts() {
+         return failedReduceAttempts;
+      }
+
+      @Override
+      public int mapsRunning() {
+         return totalMapTaskCount - mapsCompleted;
+      }
+
+      void setTotalMapTaskCount(int mapCount) {
+         this.totalMapTaskCount = mapCount;
+      }
+
+      void increaseMapTaskCompleted() {
+         mapsCompleted += 1;
+      }
+
+      @Override
+      public int reducesRunning() {
+         return totalReduceTaskCount - reducesCompleted;
+      }
+
+      void setTotalReduceTaskCount(int reduceCount) {
+         this.totalReduceTaskCount = reduceCount;
+      }
+
+      void increaseReduceTaskCompleted() {
+         reducesCompleted += 1;
+      }
+
+      @Override
+      public int mapsCompleted() {
+         return mapsCompleted;
+      }
+
+      @Override
+      public int reducesCompleted() {
+         return reducesCompleted;
+      }
+
+      @Override
+      public long startTime() {
+         return startTime;
+      }
+
+      @Override
+      public long elapsedTime() {
+         if (MapReduceTaskStats.STATE_RUNNING.equals(state())) {
+            return System.currentTimeMillis() - startTime();
+         } else if (MapReduceTaskStats.STATE_COMPLETED.equals(state())){
+            return endTime() - startTime();
+         } else {
+            return 0;
+         }
+      }
+
+      @Override
+      public long endTime() {
+         return endTime;
+      }
+
+      @Override
+      public String state() {
+         return state;
+      }
+
+      @Override
+      public String taskId() {
+         return taskId;
+      }
    }
 }

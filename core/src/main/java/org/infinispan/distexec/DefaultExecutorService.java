@@ -61,6 +61,110 @@ import org.infinispan.util.logging.LogFactory;
  */
 public class DefaultExecutorService extends AbstractExecutorService implements DistributedExecutorService {
 
+   public class DistributedTaskStatsImpl implements DistributedTaskStats {
+
+      private int totalSubtasksCount;
+      private int subtasksCompleted;
+      private int failedSubtasks;
+      private int failedOverSubtasks;
+
+      private long startTime;
+      private long endTime;
+
+      private final String taskId;
+
+      private String state = STATE_INITIALIZED;
+
+      public DistributedTaskStatsImpl(String taskId) {
+         super();
+         this.taskId = taskId;
+      }
+
+      void setTotalSubtasksCount(int taskCount) {
+         this.totalSubtasksCount = taskCount;
+      }
+
+      void increaseSubtasksCompleted() {
+         this.subtasksCompleted += 1;
+      }
+
+      void increaseFailedSubtasks() {
+         this.failedSubtasks += 1;
+      }
+
+      void increaseFailedOverSubtasks() {
+         this.failedOverSubtasks += 1;
+      }
+
+      void setStartTime(long startTime) {
+         this.startTime = startTime;
+         this.state = STATE_RUNNING;
+      }
+
+      void setEndTime(long endTime) {
+         this.endTime = endTime;
+         this.state = STATE_COMPLETED;
+      }
+
+      @Override
+      public double progress() {
+         if (totalSubtasksCount > 0) {
+            return subtasksCompleted / totalSubtasksCount;
+         } else {
+            return 0;
+         }
+      }
+
+      @Override
+      public int subtasksRunning() {
+         return totalSubtasksCount - subtasksCompleted;
+      }
+
+      @Override
+      public int subtasksCompleted() {
+         return subtasksCompleted;
+      }
+
+      @Override
+      public int failedSubtasks() {
+         return failedSubtasks;
+      }
+
+      @Override
+      public long startTime() {
+         return startTime;
+      }
+
+      @Override
+      public long elapsedTime() {
+         return System.currentTimeMillis() - startTime();
+      }
+
+      @Override
+      public long endTime() {
+         return endTime;
+      }
+
+      @Override
+      public String state() {
+         return "";
+      }
+
+      @Override
+      public String taskId() {
+         return taskId;
+      }
+
+      public String getState() {
+         return state;
+      }
+
+      @Override
+      public int failedOverSubtasks() {
+         return failedOverSubtasks;
+      }
+   }
+
    private static final NodeFilter SAME_MACHINE_FILTER = new NodeFilter(){
       @Override
       public boolean include(TopologyAwareAddress thisAddress, TopologyAwareAddress otherAddress) {
@@ -437,6 +541,10 @@ public class DefaultExecutorService extends AbstractExecutorService implements D
    public <T, K> NotifyingFuture<T> submit(DistributedTask<T> task, K... input) {
       if (task == null) throw new NullPointerException();
 
+      DistributedTaskStatsImpl taskStats = (DistributedTaskStatsImpl) task.getTaskStats();
+      taskStats.setStartTime(System.currentTimeMillis());
+      taskStats.setTotalSubtasksCount(1);
+
       if(inputKeysSpecified(input)){
          Map<Address, List<K>> nodesKeysMap = keysToExecutionNodes(task.getTaskExecutionPolicy(), input);
          checkExecutionPolicy(task, nodesKeysMap, input);
@@ -465,6 +573,11 @@ public class DefaultExecutorService extends AbstractExecutorService implements D
       List<Address> members = executionCandidates(task);
       List<Future<T>> futures = new ArrayList<Future<T>>(members.size());
       Address me = getAddress();
+
+      DistributedTaskStatsImpl taskStats = (DistributedTaskStatsImpl) task.getTaskStats();
+      taskStats.setStartTime(System.currentTimeMillis());
+      taskStats.setTotalSubtasksCount(members.size());
+
       for (Address target : members) {
          DistributedExecuteCommand<T> c = null;
          if (target.equals(me)) {
@@ -494,6 +607,10 @@ public class DefaultExecutorService extends AbstractExecutorService implements D
          Address me = getAddress();
          Map<Address, List<K>> nodesKeysMap = keysToExecutionNodes(task.getTaskExecutionPolicy(), input);
          checkExecutionPolicy(task, nodesKeysMap, input);
+
+         DistributedTaskStatsImpl taskStats = (DistributedTaskStatsImpl) task.getTaskStats();
+         taskStats.setStartTime(System.currentTimeMillis());
+         taskStats.setTotalSubtasksCount(nodesKeysMap.size());
          for (Entry<Address, List<K>> e : nodesKeysMap.entrySet()) {
             Address target = e.getKey();
             DistributedExecuteCommand<T> c = null;
@@ -526,6 +643,9 @@ public class DefaultExecutorService extends AbstractExecutorService implements D
 
    protected <T, K> DistributedTaskPart<T> createDistributedTaskPart(DistributedTask<T> task,
             DistributedExecuteCommand<T> c, Address target, int failoverCount) {
+      DistributedTaskStatsImpl taskStats = (DistributedTaskStatsImpl) task.getTaskStats();
+      taskStats.setStartTime(System.currentTimeMillis());
+      taskStats.setTotalSubtasksCount(1);
       return createDistributedTaskPart(task, c, Collections.emptyList(), target, failoverCount);
    }
 
@@ -710,10 +830,12 @@ public class DefaultExecutorService extends AbstractExecutorService implements D
       private long timeout;
       private DistributedTaskExecutionPolicy executionPolicy = DistributedTaskExecutionPolicy.ALL;
       private DistributedTaskFailoverPolicy failoverPolicy = NO_FAILOVER;
+      private final DistributedTaskStatsImpl stats;
 
 
       public DefaultDistributedTaskBuilder(long taskTimeout) {
          this.timeout = taskTimeout;
+         this.stats = new DistributedTaskStatsImpl(UUID.randomUUID().toString());
       }
 
       @Override
@@ -776,6 +898,11 @@ public class DefaultExecutorService extends AbstractExecutorService implements D
       @Override
       public Callable<T> getCallable() {
          return callable;
+      }
+
+      @Override
+      public DistributedTaskStats getTaskStats() {
+         return stats;
       }
    }
 
@@ -851,6 +978,7 @@ public class DefaultExecutorService extends AbstractExecutorService implements D
          if (isCancelled())
             throw new CancellationException("Task already cancelled");
 
+         DistributedTaskStatsImpl taskStats = (DistributedTaskStatsImpl) getOwningTask().getTaskStats();
          long timeoutNanos = computeTimeoutNanos(timeout, unit);
          long endNanos = timeService.expectedEndTime(timeoutNanos, TimeUnit.NANOSECONDS);
          try {
@@ -858,6 +986,7 @@ public class DefaultExecutorService extends AbstractExecutorService implements D
          } catch (TimeoutException te) {
             throw te;
          } catch (Exception e) {
+            taskStats.increaseFailedSubtasks();
             // The RPC could have finished with a org.infinispan.util.concurrent.TimeoutException right before
             // the Future.get timeout expired. If that's the case, we want to throw a TimeoutException.
             long remainingNanos = timeoutNanos > 0 ? timeService.remainingTime(endNanos, TimeUnit.NANOSECONDS) : timeoutNanos;
@@ -867,6 +996,7 @@ public class DefaultExecutorService extends AbstractExecutorService implements D
             }
             boolean canFailover = failedOverCount++ < getOwningTask().getTaskFailoverPolicy().maxFailoverAttempts();
             if (canFailover) {
+               taskStats.increaseFailedOverSubtasks();
                try {
                   return failoverExecution(e, timeoutNanos, TimeUnit.NANOSECONDS);
                } catch (Exception failedOver) {
@@ -875,6 +1005,8 @@ public class DefaultExecutorService extends AbstractExecutorService implements D
             } else {
                throw wrapIntoExecutionException(e);
             }
+         } finally {
+            taskStats.increaseSubtasksCompleted();
          }
       }
 
