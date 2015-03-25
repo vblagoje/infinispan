@@ -34,7 +34,7 @@ public class CacheContainerStatsImpl implements CacheContainerStats, JmxStatisti
    @Override
    public void setStatisticsEnabled(boolean enabled) {
       if (enabled) {
-         // TODO we force statistics collection on all caches beloning to this cache container?
+         // should we force statistics collection on all caches belonging to this cache container?
          for (String cn : cm.getCacheNames()) {
             if (cm.cacheExists(cn)) {
                cm.getCache(cn).getAdvancedCache().getStats().setStatisticsEnabled(true);
@@ -63,8 +63,8 @@ public class CacheContainerStatsImpl implements CacheContainerStats, JmxStatisti
 
    @Start(priority = 9)
    private void start() {
-      //TODO how to read this property i.e. if cache container stats are enabled?
-      //setStatisticsEnabled();
+      boolean globalJmxStatsEnabled = cm.getCacheManagerConfiguration().globalJmxStatistics().enabled();
+      setStatisticsEnabled(globalJmxStatsEnabled);
    }
 
 
