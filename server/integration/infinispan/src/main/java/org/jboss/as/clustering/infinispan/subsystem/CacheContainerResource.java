@@ -379,6 +379,7 @@ public class CacheContainerResource extends SimpleResourceDefinition {
         resourceRegistration.registerOperationHandler(TASK_EXECUTE, CacheContainerCommands.TaskExecuteCommand.INSTANCE);
         resourceRegistration.registerOperationHandler(TASK_STATUS, CacheContainerCommands.TaskStatusCommand.INSTANCE);
         resourceRegistration.registerOperationHandler(CLUSTER_REBALANCE_OPERATION, CacheContainerCommands.ClusterRebalanceCommand.INSTANCE);
+        CounterManagerCommands.register(resourceRegistration);
     }
 
     @Override
@@ -402,5 +403,6 @@ public class CacheContainerResource extends SimpleResourceDefinition {
         resourceRegistration.registerSubModel(new InvalidationCacheResource(resolvePathHandler, runtimeRegistration));
         resourceRegistration.registerSubModel(new ReplicatedCacheResource(resolvePathHandler, runtimeRegistration));
         resourceRegistration.registerSubModel(new DistributedCacheResource(resolvePathHandler, runtimeRegistration));
+        //resourceRegistration.registerSubModel(new CounterResource(resolvePathHandler, runtimeRegistration));
     }
 }

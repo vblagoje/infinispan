@@ -123,7 +123,7 @@ public class CounterConfiguration {
       private long lowerBound = Long.MIN_VALUE;
       private long upperBound = Long.MAX_VALUE;
       private Storage storage = Storage.VOLATILE;
-      private int concurrencyLevel = 64;
+      private int concurrencyLevel = 16;
 
       private Builder(CounterType type) {
          this.type = type;

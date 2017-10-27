@@ -282,4 +282,5 @@ public class ModelKeys {
     static final String TRANSPORT_THREAD_POOL = "transport-thread-pool";
     static final String READ_BATCH = "read-batch";
     static final String WRITE_THREADS = "write-threads";
+    static final String COUNTER = "counter";
 }
