@@ -19,18 +19,15 @@
  * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
  * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
  */
-
 package org.jboss.as.clustering.infinispan.subsystem;
 
-import org.infinispan.counter.api.Storage;
-import org.jboss.as.controller.AbstractAddStepHandler;
+import org.infinispan.counter.api.CounterType;
 import org.jboss.as.controller.AttributeDefinition;
 import org.jboss.as.controller.OperationStepHandler;
 import org.jboss.as.controller.PathElement;
+import org.jboss.as.controller.ReloadRequiredRemoveStepHandler;
 import org.jboss.as.controller.ReloadRequiredWriteAttributeHandler;
 import org.jboss.as.controller.SimpleAttributeDefinitionBuilder;
-import org.jboss.as.controller.SimpleResourceDefinition;
-import org.jboss.as.controller.descriptions.ResourceDescriptionResolver;
 import org.jboss.as.controller.registry.AttributeAccess;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
 import org.jboss.as.controller.services.path.ResolvePathHandler;
@@ -44,62 +41,53 @@ import org.jboss.dmr.ModelType;
  * @author Vladimir Blagojevic
  * @since 9.2
  */
-public class CounterResource extends SimpleResourceDefinition {
+public class StrongCounterResource extends CounterResource {
+   
+   public static final PathElement PATH = PathElement.pathElement(ModelKeys.STRONG_COUNTER);
 
-   //atributes
-   static final AttributeDefinition COUNTER_NAME =
-         new SimpleAttributeDefinitionBuilder(ModelKeys.NAME, ModelType.STRING, false)
-            .setXmlName(Attribute.NAME.getLocalName())
+   static final AttributeDefinition LOWER_BOUND = 
+         new SimpleAttributeDefinitionBuilder(ModelKeys.LOWER_BOUND, ModelType.LONG, true)
+         .setXmlName(Attribute.LOWER_BOUND.getLocalName())
+         .setAllowExpression(false)
+         .setFlags(AttributeAccess.Flag.RESTART_RESOURCE_SERVICES)
+         .build();         
+   
+   static final AttributeDefinition UPPER_BOUND = 
+         new SimpleAttributeDefinitionBuilder(ModelKeys.UPPER_BOUND, ModelType.LONG, true)
+         .setXmlName(Attribute.UPPER_BOUND.getLocalName())
+         .setAllowExpression(false)
+         .setFlags(AttributeAccess.Flag.RESTART_RESOURCE_SERVICES)
+         .build();     
+   
+   static final AttributeDefinition TYPE = 
+         new SimpleAttributeDefinitionBuilder(ModelKeys.TYPE, ModelType.STRING, false)
+            .setXmlName(Attribute.TYPE.getLocalName())
             .setAllowExpression(false)
             .setFlags(AttributeAccess.Flag.RESTART_RESOURCE_SERVICES)
-            .build();
-
-   static final AttributeDefinition STORAGE =
-         new SimpleAttributeDefinitionBuilder(ModelKeys.STORAGE, ModelType.STRING, false)
-         .setXmlName(Attribute.STORAGE.getLocalName())
-         .setAllowExpression(false)
-         .setFlags(AttributeAccess.Flag.RESTART_RESOURCE_SERVICES)
-         .setAllowedValues(Storage.VOLATILE.toString(), Storage.PERSISTENT.toString())
-         .build();
-
-   static final AttributeDefinition INITIAL_VALUE =
-         new SimpleAttributeDefinitionBuilder(ModelKeys.INITIAL_VALUE, ModelType.LONG, true)
-         .setXmlName(Attribute.INITIAL_VALUE.getLocalName())
-         .setAllowExpression(false)
-         .setFlags(AttributeAccess.Flag.RESTART_RESOURCE_SERVICES)
-         .build();
-
-   static final AttributeDefinition[] ATTRIBUTES = { COUNTER_NAME, STORAGE, INITIAL_VALUE };
-
-   // operations
-
-   private final boolean runtimeRegistration;
-   private final ResolvePathHandler resolvePathHandler;
-
-   public CounterResource(PathElement pathElement, ResourceDescriptionResolver descriptionResolver,
-         ResolvePathHandler resolvePathHandler, AbstractAddStepHandler addHandler, OperationStepHandler removeHandler,
-         boolean runtimeRegistration) {
-      super(pathElement, descriptionResolver, addHandler, removeHandler);
-      this.resolvePathHandler = resolvePathHandler;
-      this.runtimeRegistration = runtimeRegistration;
+            .setAllowedValues(CounterType.BOUNDED_STRONG.toString(), CounterType.UNBOUNDED_STRONG.toString())
+            .build();            
+   
+   static final AttributeDefinition[] STRONG_ATTRIBUTES = { LOWER_BOUND, TYPE, UPPER_BOUND };
+     
+   public StrongCounterResource(ResolvePathHandler resolvePathHandler, boolean runtimeRegistration) {
+      super(StrongCounterResource.PATH, 
+            new InfinispanResourceDescriptionResolver(ModelKeys.COUNTERS), 
+            resolvePathHandler, new StrongCounterAddHandler(),
+            ReloadRequiredRemoveStepHandler.INSTANCE, runtimeRegistration);      
    }
 
    @Override
    public void registerAttributes(ManagementResourceRegistration resourceRegistration) {
       super.registerAttributes(resourceRegistration);
-      final OperationStepHandler writeHandler = new ReloadRequiredWriteAttributeHandler(ATTRIBUTES);
-      for (AttributeDefinition attr : ATTRIBUTES) {
+      
+      final OperationStepHandler writeHandler = new ReloadRequiredWriteAttributeHandler(STRONG_ATTRIBUTES);
+      for (AttributeDefinition attr : STRONG_ATTRIBUTES) {
           resourceRegistration.registerReadWriteAttribute(attr, null, writeHandler);
-      }
-
-      if (runtimeRegistration) {
-          // TODO runtime attributes go here
       }
    }
 
    @Override
    public void registerOperations(ManagementResourceRegistration resourceRegistration) {
-      //TODO register reset op here
-      super.registerOperations(resourceRegistration);
+      super.registerOperations(resourceRegistration);      
    }
 }
