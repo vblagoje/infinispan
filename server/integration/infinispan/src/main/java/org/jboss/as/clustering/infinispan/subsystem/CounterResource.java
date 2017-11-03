@@ -92,11 +92,21 @@ public class CounterResource extends SimpleResourceDefinition {
          .setFlags(AttributeAccess.Flag.RESTART_RESOURCE_SERVICES)
          .build();
 
+   static final AttributeDefinition VALUE = new SimpleAttributeDefinitionBuilder(ModelKeys.VALUE,
+         ModelType.LONG, true)
+         .setXmlName(Attribute.VALUE.getLocalName())
+         .setAllowExpression(false)
+         .setFlags(AttributeAccess.Flag.RESTART_RESOURCE_SERVICES)
+         .build();
+
    static final AttributeDefinition[] ATTRIBUTES = { COUNTER_NAME, STORAGE, INITIAL_VALUE };
 
    // operations
 
    private static final OperationDefinition COUNTER_RESET = buildOperation("counter-reset").build();
+   private static final OperationDefinition COUNTER_SET = buildOperation("counter-set").setParameters((VALUE)).build();
+   private static final OperationDefinition COUNTER_INCREASE = buildOperation("counter-increase").build();
+   private static final OperationDefinition COUNTER_DECREASE = buildOperation("counter-decrease").build();
 
    private final boolean runtimeRegistration;
    private final ResolvePathHandler resolvePathHandler;
@@ -126,7 +136,10 @@ public class CounterResource extends SimpleResourceDefinition {
    public void registerOperations(ManagementResourceRegistration resourceRegistration) {
       //TODO register reset op here
       super.registerOperations(resourceRegistration);
+      resourceRegistration.registerOperationHandler(CounterResource.COUNTER_SET, CounterSetCommand.INSTANCE);
       resourceRegistration.registerOperationHandler(CounterResource.COUNTER_RESET, CounterResetCommand.INSTANCE);
+      resourceRegistration.registerOperationHandler(CounterResource.COUNTER_INCREASE, CounterIncreaseCommand.INSTANCE);
+      resourceRegistration.registerOperationHandler(CounterResource.COUNTER_DECREASE, CounterDecreaseCommand.INSTANCE);
    }
 
    private static SimpleOperationDefinitionBuilder buildOperation(String name) {
@@ -201,6 +214,87 @@ public class CounterResource extends SimpleResourceDefinition {
             } else {
                WeakCounter weakCounter = counterManager.getWeakCounter(counterName);
                weakCounter.reset();
+            }
+         }
+         return new ModelNode();
+      }
+   }
+
+   private static class CounterSetCommand extends BaseCounterManagerCommand {
+      private static final CounterSetCommand INSTANCE = new CounterSetCommand();
+
+      private CounterSetCommand() {
+         super();
+      }
+
+      @Override
+      protected ModelNode invoke(CounterManager counterManager, OperationContext context, ModelNode operation)
+            throws Exception {
+         final String counterName = counterName(context, operation);
+         final String counterType = counterType(context, operation);
+         System.out.println(operation);
+         System.out.println(context);
+         if (counterManager.isDefined(counterName)) {
+            boolean isStrongCounter = ModelKeys.STRONG_COUNTER.equals(counterType);
+            if (isStrongCounter) {
+               StrongCounter strongCounter = counterManager.getStrongCounter(counterName);
+               //set the value
+
+            } else {
+               WeakCounter weakCounter = counterManager.getWeakCounter(counterName);
+               //set the value
+            }
+         }
+         return new ModelNode();
+      }
+   }
+
+   private static class CounterIncreaseCommand extends BaseCounterManagerCommand {
+      private static final CounterIncreaseCommand INSTANCE = new CounterIncreaseCommand();
+
+      private CounterIncreaseCommand() {
+         super();
+      }
+
+      @Override
+      protected ModelNode invoke(CounterManager counterManager, OperationContext context, ModelNode operation)
+            throws Exception {
+         final String counterName = counterName(context, operation);
+         final String counterType = counterType(context, operation);
+         if (counterManager.isDefined(counterName)) {
+            boolean isStrongCounter = ModelKeys.STRONG_COUNTER.equals(counterType);
+            if (isStrongCounter) {
+               StrongCounter strongCounter = counterManager.getStrongCounter(counterName);
+               strongCounter.incrementAndGet();
+            } else {
+               WeakCounter weakCounter = counterManager.getWeakCounter(counterName);
+               weakCounter.increment();
+            }
+         }
+         return new ModelNode();
+      }
+   }
+
+   private static class CounterDecreaseCommand extends BaseCounterManagerCommand {
+      private static final CounterDecreaseCommand INSTANCE = new CounterDecreaseCommand();
+
+      private CounterDecreaseCommand() {
+         super();
+      }
+
+      @Override
+      protected ModelNode invoke(CounterManager counterManager, OperationContext context, ModelNode operation)
+            throws Exception {
+         final String counterName = counterName(context, operation);
+         final String counterType = counterType(context, operation);
+         if (counterManager.isDefined(counterName)) {
+            boolean isStrongCounter = ModelKeys.STRONG_COUNTER.equals(counterType);
+            if (isStrongCounter) {
+               StrongCounter strongCounter = counterManager.getStrongCounter(counterName);
+               strongCounter.decrementAndGet();
+            } else {
+               WeakCounter weakCounter = counterManager.getWeakCounter(counterName);
+               weakCounter.decrement();
             }
          }
          return new ModelNode();
