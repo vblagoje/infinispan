@@ -1,25 +1,3 @@
-/*
- * JBoss, Home of Professional Open Source.
- * Copyright 2017, Red Hat, Inc., and individual contributors
- * as indicated by the @author tags. See the copyright.txt file in the
- * distribution for a full listing of individual contributors.
- *
- * This is free software; you can redistribute it and/or modify it
- * under the terms of the GNU Lesser General Public License as
- * published by the Free Software Foundation; either version 2.1 of
- * the License, or (at your option) any later version.
- *
- * This software is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this software; if not, write to the Free
- * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
- * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
- */
-
 package org.jboss.as.clustering.infinispan.subsystem;
 
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP_ADDR;
@@ -30,7 +8,6 @@ import org.infinispan.counter.api.CounterManager;
 import org.infinispan.server.infinispan.spi.service.CacheContainerServiceName;
 import org.jboss.as.clustering.infinispan.DefaultCacheContainer;
 import org.jboss.as.controller.AbstractAddStepHandler;
-import org.jboss.as.controller.AttributeDefinition;
 import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.PathAddress;
@@ -48,7 +25,7 @@ import org.jboss.msc.service.ServiceRegistry;
 public class CounterAddHandler extends AbstractAddStepHandler {
 
     CounterAddHandler() {
-        super();
+        super(CounterResource.ATTRIBUTES);
     }
 
     @Override
@@ -85,23 +62,6 @@ public class CounterAddHandler extends AbstractAddStepHandler {
             }
         } catch (Exception e) {
             throw new OperationFailedException("Could not create counter " + counterName, e);
-        }
-    }
-
-    @Override
-    protected void populateModel(ModelNode operation, ModelNode model) throws OperationFailedException {
-        this.populate(operation, model);
-    }
-
-    /**
-     * Transfer elements common to both operations and models
-     *
-     * @param fromModel
-     * @param toModel
-     */
-    void populate(ModelNode fromModel, ModelNode toModel) throws OperationFailedException {
-        for (AttributeDefinition attr : CounterResource.ATTRIBUTES) {
-            attr.validateAndSet(fromModel, toModel);
         }
     }
 

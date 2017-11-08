@@ -85,15 +85,10 @@ public class CounterConfigurationResource extends SimpleResourceDefinition {
 
    static final AttributeDefinition[] ATTRIBUTES = { COUNTER_NAME, STORAGE, INITIAL_VALUE };
 
-   private final boolean runtimeRegistration;
-   private final ResolvePathHandler resolvePathHandler;
-
    public CounterConfigurationResource(PathElement pathElement, ResourceDescriptionResolver descriptionResolver,
          ResolvePathHandler resolvePathHandler, AbstractAddStepHandler addHandler, OperationStepHandler removeHandler,
          boolean runtimeRegistration) {
       super(pathElement, descriptionResolver, addHandler, removeHandler);
-      this.resolvePathHandler = resolvePathHandler;
-      this.runtimeRegistration = runtimeRegistration;
    }
 
    @Override
@@ -103,10 +98,5 @@ public class CounterConfigurationResource extends SimpleResourceDefinition {
       for (AttributeDefinition attr : ATTRIBUTES) {
          resourceRegistration.registerReadWriteAttribute(attr, null, writeHandler);
       }
-   }
-
-   @Override
-   public void registerOperations(ManagementResourceRegistration resourceRegistration) {
-      super.registerOperations(resourceRegistration);
    }
 }

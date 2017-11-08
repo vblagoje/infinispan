@@ -212,8 +212,7 @@ public class InfinispanSubsystemXMLWriter implements XMLElementWriter<SubsystemM
 
       if (configurations.hasDefined(ModelKeys.COUNTERS)) {
          writer.writeStartElement(Element.COUNTERS.getLocalName());
-         ModelNode counterConfigurations = configurations.get(ModelKeys.COUNTERS);
-         System.out.println(counterConfigurations);
+         ModelNode counterConfigurations = configurations.get(ModelKeys.COUNTERS);         
          counterConfigurations = counterConfigurations.get(ModelKeys.COUNTERS_NAME);
          processStrongCounterConfigurations(writer, counterConfigurations.get(ModelKeys.STRONG_COUNTER));
          processWeakCounterConfigurations(writer, counterConfigurations.get(ModelKeys.WEAK_COUNTER));

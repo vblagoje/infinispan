@@ -83,9 +83,4 @@ public class StrongCounterConfigurationResource extends CounterConfigurationReso
           resourceRegistration.registerReadWriteAttribute(attr, null, writeHandler);
       }
    }
-
-   @Override
-   public void registerOperations(ManagementResourceRegistration resourceRegistration) {
-      super.registerOperations(resourceRegistration);      
-   }
 }

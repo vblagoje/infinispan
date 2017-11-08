@@ -36,21 +36,8 @@ import org.jboss.dmr.ModelNode;
  */
 public class StrongCounterConfigurationAddHandler extends CounterConfigurationAddHandler {
 
-   StrongCounterConfigurationAddHandler() {
-      super();
-   }
-
-   @Override
-   protected void performRuntime(OperationContext context, ModelNode operation, ModelNode model)
-         throws OperationFailedException {
-      super.performRuntime(context, operation, model);
-   }
-
    /**
-    * Transfer elements common to both operations and models
-    *
-    * @param fromModel
-    * @param toModel
+    * 
     */
    void populate(ModelNode fromModel, ModelNode toModel) throws OperationFailedException {
       super.populate(fromModel, toModel);
