@@ -104,4 +104,6 @@ public class MetricKeys {
 
     // Counter
     public static final String VALUE="value";
+    public static final String NUM_OF_OWNERS = "num-owners";
+    public static final String RELIABILITY = "reliability";
 }

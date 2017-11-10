@@ -33,4 +33,12 @@ public class CacheContainerCountersResource extends SimpleResourceDefinition {
         rr.registerSubModel(new CounterResource(strongCounterPath, resolvePathHandler, runtimeRegistration));
         rr.registerSubModel(new CounterResource(weakCounterPath, resolvePathHandler, runtimeRegistration));
     }
+
+    @Override
+    public void registerAttributes(ManagementResourceRegistration resourceRegistration) {
+        super.registerAttributes(resourceRegistration);
+        if (runtimeRegistration) {
+            CounterConfigurationMetricsHandler.INSTANCE.registerMetrics(resourceRegistration);
+        }
+    }
 }
