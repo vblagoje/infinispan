@@ -1,10 +1,15 @@
 package org.jboss.as.clustering.infinispan.subsystem;
 
+import org.jboss.as.controller.AttributeDefinition;
 import org.jboss.as.controller.PathElement;
 import org.jboss.as.controller.ReloadRequiredRemoveStepHandler;
+import org.jboss.as.controller.SimpleAttributeDefinition;
+import org.jboss.as.controller.SimpleAttributeDefinitionBuilder;
 import org.jboss.as.controller.SimpleResourceDefinition;
+import org.jboss.as.controller.registry.AttributeAccess;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
 import org.jboss.as.controller.services.path.ResolvePathHandler;
+import org.jboss.dmr.ModelType;
 
 /**
  * CacheContainerCountersResource
@@ -14,6 +19,30 @@ import org.jboss.as.controller.services.path.ResolvePathHandler;
  */
 public class CacheContainerCountersResource extends SimpleResourceDefinition {
     static final PathElement PATH = PathElement.pathElement(ModelKeys.COUNTERS, ModelKeys.COUNTERS_NAME);
+
+    //TODO Could not find these definitions anywhere in counter API
+    private static final String AVAILABLE = "AVAILABLE";
+    private static final String CONSISTENT = "CONSISTENT";
+
+    //atributes
+    static final SimpleAttributeDefinition RELIABILITY = new SimpleAttributeDefinitionBuilder(ModelKeys.RELIABILITY,
+            ModelType.STRING, false)
+            .setXmlName(Attribute.RELIABILITY.getLocalName())
+            .setAllowExpression(false)
+            .setAllowedValues(AVAILABLE.toString(), CONSISTENT.toString())
+            .setFlags(AttributeAccess.Flag.RESTART_RESOURCE_SERVICES)
+            .build();
+
+    static final SimpleAttributeDefinition NUM_OWNERS = new SimpleAttributeDefinitionBuilder(ModelKeys.NUM_OWNERS,
+            ModelType.LONG, false)
+            .setXmlName(Attribute.NUM_OWNERS.getLocalName())
+            .setAllowExpression(false)
+            .setFlags(AttributeAccess.Flag.RESTART_RESOURCE_SERVICES)
+            .build();
+
+
+    static final AttributeDefinition[] ATTRIBUTES = { RELIABILITY, NUM_OWNERS };
+
 
     private final boolean runtimeRegistration;
     private final ResolvePathHandler resolvePathHandler;

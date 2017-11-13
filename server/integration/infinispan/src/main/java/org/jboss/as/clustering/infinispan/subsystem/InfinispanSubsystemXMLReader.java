@@ -360,7 +360,7 @@ public final class InfinispanSubsystemXMLReader implements XMLElementReader<List
                 }
                 case COUNTERS: {
                    if (namespace.since(Namespace.INFINISPAN_SERVER_9_2)) {
-                       this.parseCounters(reader, countersConfigurationAddress, operations);
+                       this.parseCounters(reader, countersAddress, countersConfigurationAddress, operations);
                        break;
                    }
                 }
@@ -371,19 +371,20 @@ public final class InfinispanSubsystemXMLReader implements XMLElementReader<List
         }
     }
 
-    private void parseCounters(XMLExtendedStreamReader reader, PathAddress countersConfigurationAddress,
+    private void parseCounters(XMLExtendedStreamReader reader, PathAddress countersAddress, PathAddress countersConfigurationAddress,
             Map<PathAddress, ModelNode> operations) throws XMLStreamException {
 
+        ModelNode counters = operations.get(countersAddress);
         for (int i = 0; i < reader.getAttributeCount(); i++) {
             String value = reader.getAttributeValue(i);
             Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
             switch (attribute) {
                 case NUM_OWNERS: {
-                    //TODO
+                    CacheContainerCountersResource.NUM_OWNERS.parseAndSetParameter(value, counters, reader);
                     break;
                 }
                 case RELIABILITY: {
-                    //TODO
+                    CacheContainerCountersResource.RELIABILITY.parseAndSetParameter(value, counters, reader);
                     break;
                 }
                 default: {
