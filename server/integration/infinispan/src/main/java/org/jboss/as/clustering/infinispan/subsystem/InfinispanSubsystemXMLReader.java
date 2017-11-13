@@ -439,11 +439,6 @@ public final class InfinispanSubsystemXMLReader implements XMLElementReader<List
                             counter, reader);
                     break;
                 }
-                case TYPE: {
-                    ((SimpleAttributeDefinition) StrongCounterConfigurationResource.TYPE).parseAndSetParameter(value,
-                            counter, reader);
-                    break;
-                }
                 default: {
                     throw ParseUtils.unexpectedAttribute(reader, i);
                 }

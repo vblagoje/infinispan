@@ -33,10 +33,15 @@ public class StrongCounterConfigurationAddHandler extends CounterConfigurationAd
          CounterConfiguration.Builder builder) throws OperationFailedException {
       super.processModelNode(context, containerName, counter, builder);
 
-      Long lowerBound = StrongCounterConfigurationResource.LOWER_BOUND.resolveModelAttribute(context, counter).asLong();
-      Long upperBound = StrongCounterConfigurationResource.UPPER_BOUND.resolveModelAttribute(context, counter).asLong();
-
-      builder.lowerBound(lowerBound);
-      builder.upperBound(upperBound);
+      ModelNode upperBoundModel = counter.get(ModelKeys.UPPER_BOUND);
+      ModelNode lowerBoundModel = counter.get(ModelKeys.LOWER_BOUND);
+      if (lowerBoundModel.isDefined()) {
+          Long lowerBound = StrongCounterConfigurationResource.LOWER_BOUND.resolveModelAttribute(context, counter).asLong();
+          builder.lowerBound(lowerBound);
+      }
+      if (upperBoundModel.isDefined()) {
+          Long upperBound = StrongCounterConfigurationResource.UPPER_BOUND.resolveModelAttribute(context, counter).asLong();
+          builder.upperBound(upperBound);
+      }
    }
 }

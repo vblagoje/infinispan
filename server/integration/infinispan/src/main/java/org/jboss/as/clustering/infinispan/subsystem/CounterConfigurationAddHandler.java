@@ -96,8 +96,11 @@ public class CounterConfigurationAddHandler extends AbstractAddStepHandler {
         if (isWeakCounter) {
             return CounterConfiguration.builder(CounterType.WEAK);
         } else {
-            String type = StrongCounterConfigurationResource.TYPE.resolveModelAttribute(context, counter).asString();
-            return CounterConfiguration.builder(CounterType.valueOf(type));
+            ModelNode lowerBoundModel = counter.get(ModelKeys.LOWER_BOUND);
+            ModelNode upperBoundModel = counter.get(ModelKeys.UPPER_BOUND);
+            boolean isBounded = lowerBoundModel.isDefined() || upperBoundModel.isDefined();
+            return isBounded ? CounterConfiguration.builder(CounterType.BOUNDED_STRONG)
+                    : CounterConfiguration.builder(CounterType.UNBOUNDED_STRONG);
         }
     }
 

@@ -52,13 +52,6 @@ public class CounterConfigurationResource extends SimpleResourceDefinition {
          .setAllowedValues(Storage.VOLATILE.toString(), Storage.PERSISTENT.toString())
          .build();
 
-   //define but don't register
-   static final AttributeDefinition TYPE = new SimpleAttributeDefinitionBuilder(ModelKeys.TYPE, ModelType.STRING, false)
-         .setXmlName(Attribute.TYPE.getLocalName())
-         .setAllowExpression(false)
-         .setFlags(AttributeAccess.Flag.RESTART_RESOURCE_SERVICES)
-         .build();
-
    static final AttributeDefinition INITIAL_VALUE = new SimpleAttributeDefinitionBuilder(ModelKeys.INITIAL_VALUE,
          ModelType.LONG, true)
          .setXmlName(Attribute.INITIAL_VALUE.getLocalName())

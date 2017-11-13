@@ -254,7 +254,6 @@ public class InfinispanSubsystemXMLWriter implements XMLElementWriter<SubsystemM
       this.writeRequired(writer, Attribute.NAME, strongConfiguration, ModelKeys.NAME);
       this.writeRequired(writer, Attribute.INITIAL_VALUE, strongConfiguration, ModelKeys.INITIAL_VALUE);
       this.writeRequired(writer, Attribute.STORAGE, strongConfiguration, ModelKeys.STORAGE);
-      this.writeRequired(writer, Attribute.TYPE, strongConfiguration, ModelKeys.TYPE);
       if (strongConfiguration.hasDefined(ModelKeys.LOWER_BOUND)) {
          writer.writeStartElement(Element.LOWER_BOUND.getLocalName());
          this.writeRequired(writer, Attribute.VALUE, strongConfiguration, ModelKeys.LOWER_BOUND);
