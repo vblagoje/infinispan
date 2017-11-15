@@ -143,6 +143,11 @@
                     </xs:annotation>
                 </xs:element>
             </xs:choice>
+            <xs:element name="counters" type="tns:counters" minOccurs="0" maxOccurs="1">
+                <xs:annotation>
+                    <xs:documentation>Defines counters.</xs:documentation>
+                </xs:annotation>
+            </xs:element>
         </xs:sequence>
         <xs:attribute name="name" type="xs:string" use="required">
             <xs:annotation>
