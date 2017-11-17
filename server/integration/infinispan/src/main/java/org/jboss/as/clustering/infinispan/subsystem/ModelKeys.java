@@ -81,7 +81,6 @@ public class ModelKeys {
     static final String CONFIGURATIONS_NAME = "CONFIGURATIONS";
     static final String CONNECTION_POOL = "connection-pool";
     static final String CONNECTION_TIMEOUT = "connection-timeout";
-    static final String CONCURRENCY = "concurrency";
     static final String COUNTERS = "counters";
     static final String COUNTERS_NAME = "COUNTERS";
     static final String CREATE_ON_START = "create-on-start";

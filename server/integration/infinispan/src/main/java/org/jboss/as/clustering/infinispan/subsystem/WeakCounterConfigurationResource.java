@@ -24,14 +24,14 @@ public class WeakCounterConfigurationResource extends CounterConfigurationResour
 
    public static final PathElement PATH = PathElement.pathElement(ModelKeys.WEAK_COUNTER);
 
-   static final SimpleAttributeDefinition CONCURRENCY = new SimpleAttributeDefinitionBuilder(ModelKeys.CONCURRENCY,
+   static final SimpleAttributeDefinition CONCURRENCY_LEVEL = new SimpleAttributeDefinitionBuilder(ModelKeys.CONCURRENCY_LEVEL,
          ModelType.INT, true)
-           .setXmlName(Attribute.CONCURRENCY.getLocalName())
+           .setXmlName(Attribute.CONCURRENCY_LEVEL.getLocalName())
            .setAllowExpression(false)
            .setDefaultValue(new ModelNode().set(64))
            .setFlags(AttributeAccess.Flag.RESTART_RESOURCE_SERVICES).build();
 
-   static final AttributeDefinition[] WEAK_ATTRIBUTES = { CONCURRENCY };
+   static final AttributeDefinition[] WEAK_ATTRIBUTES = { CONCURRENCY_LEVEL };
 
    public WeakCounterConfigurationResource(ResolvePathHandler resolvePathHandler, boolean runtimeRegistration) {
       super(WeakCounterConfigurationResource.PATH, new InfinispanResourceDescriptionResolver(ModelKeys.COUNTERS), resolvePathHandler,

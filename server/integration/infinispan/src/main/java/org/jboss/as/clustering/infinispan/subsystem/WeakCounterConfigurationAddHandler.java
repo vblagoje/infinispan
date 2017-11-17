@@ -36,7 +36,7 @@ public class WeakCounterConfigurationAddHandler extends CounterConfigurationAddH
          CounterConfiguration.Builder builder) throws OperationFailedException {
       super.processModelNode(context, containerName, counter, builder);
 
-      Integer concurrency = WeakCounterConfigurationResource.CONCURRENCY.resolveModelAttribute(context, counter).asInt();
+      Integer concurrency = WeakCounterConfigurationResource.CONCURRENCY_LEVEL.resolveModelAttribute(context, counter).asInt();
       builder.concurrencyLevel(concurrency);
    }
 }
