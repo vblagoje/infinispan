@@ -222,6 +222,11 @@ public final class InfinispanSubsystemXMLReader implements XMLElementReader<List
                 pool -> operations.put(containerAddress.append(pool.getPathElement()), Util.createAddOperation(containerAddress.append(pool.getPathElement())))
         );
 
+        if (namespace.since(Namespace.INFINISPAN_SERVER_9_2)) {
+            PathAddress countersAddress = containerAddress.append(CacheContainerCountersResource.PATH);
+            operations.put(countersAddress, Util.getEmptyOperation(ADD, countersAddress.toModelNode()));
+        }
+
         while (reader.hasNext() && (reader.nextTag() != XMLStreamConstants.END_ELEMENT)) {
             Element element = Element.forName(reader.getLocalName());
             switch (element) {
@@ -352,7 +357,6 @@ public final class InfinispanSubsystemXMLReader implements XMLElementReader<List
                 case COUNTERS: {
                    if (namespace.since(Namespace.INFINISPAN_SERVER_9_2)) {
                        PathAddress countersAddress = containerAddress.append(CacheContainerCountersResource.PATH);
-                       operations.put(countersAddress, Util.getEmptyOperation(ADD, countersAddress.toModelNode()));
                        this.parseCounters(reader, countersAddress, operations);
                        break;
                    }
